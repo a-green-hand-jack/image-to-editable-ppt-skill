@@ -80,6 +80,11 @@ ASSET_SHEET_TERMS = {
     "split",
     "分离",
 }
+SEMANTIC_FOREGROUND_TYPES = {
+    "icon", "pictogram", "symbol", "logo", "illustration", "person", "robot",
+    "plant", "animal", "device", "photo", "screenshot", "sticker", "badge",
+    "decorative-mark", "decorative", "semantic-visual",
+}
 FORBIDDEN_FOREGROUND_FALLBACK_TERMS = {
     "approximate",
     "approximation",
@@ -193,6 +198,71 @@ def foreground_asset_contract_violations(manifest):
     return violations
 
 
+def visual_inventory_contract_violations(manifest):
+    """Require a source-grounded, object-level inventory before visual QA passes."""
+    violations = []
+    inventory = manifest.get("visual_inventory", [])
+    if not isinstance(inventory, list):
+        return violations
+    ids = []
+    image_ids_by_path = {}
+    for image in manifest.get("images", []):
+        if isinstance(image, dict) and image.get("path") and image.get("id"):
+            path = Path(image["path"]).as_posix()
+            image_ids_by_path.setdefault(path, set()).add(str(image["id"]).strip())
+    represented_ids = {
+        str(item.get("id")).strip()
+        for section in ("images", "shapes", "tables", "text_boxes")
+        for item in manifest.get(section, [])
+        if isinstance(item, dict) and str(item.get("id", "")).strip()
+    }
+    semantic_ids = []
+    for index, item in enumerate(inventory):
+        field = f"visual_inventory[{index}]"
+        if not isinstance(item, dict):
+            violations.append({"field": field, "reason": "new visual inventories must be structured objects"})
+            continue
+        object_id = str(item.get("id", "")).strip()
+        if not object_id:
+            violations.append({"field": field + ".id", "reason": "every source visual object needs a stable id"})
+        elif object_id in ids:
+            violations.append({"field": field + ".id", "reason": "visual object ids must be unique", "id": object_id})
+        else:
+            ids.append(object_id)
+        role = item.get("role")
+        if role in {"foreground", "structure"}:
+            box = item.get("source_box_px") or item.get("box_px")
+            if not isinstance(box, list) or len(box) != 4 or float(box[2]) < 2 or float(box[3]) < 2:
+                violations.append({"field": field + ".source_box_px", "reason": "source visual objects require a positive source-pixel box"})
+            reps = item.get("representation_ids")
+            if not isinstance(reps, list) or not reps or not all(str(value).strip() for value in reps):
+                violations.append({"field": field + ".representation_ids", "reason": "every source visual object must map to selectable PPT object ids"})
+            else:
+                missing_reps = sorted(set(str(value).strip() for value in reps) - represented_ids)
+                if missing_reps:
+                    violations.append({"field": field + ".representation_ids", "reason": "representation ids must resolve to positioned manifest objects", "missing": missing_reps})
+        object_type = str(item.get("object_type", "")).strip().lower()
+        is_semantic = role == "foreground" or object_type in SEMANTIC_FOREGROUND_TYPES
+        if is_semantic:
+            semantic_ids.append(object_id or f"inventory_{index}")
+            if role != "foreground":
+                violations.append({"field": field + ".role", "reason": "semantic visual objects must be foreground assets, not structural shapes"})
+            path = visual_item_path(item)
+            matching_ids = image_ids_by_path.get(path, set()) if path else set()
+            if not matching_ids:
+                violations.append({"field": field, "reason": "semantic visuals require a matching manifest image asset with an id"})
+            elif not isinstance(item.get("representation_ids"), list) or not matching_ids.intersection(item["representation_ids"]):
+                violations.append({"field": field + ".representation_ids", "reason": "semantic visual representation must identify its matching image asset"})
+    audit = manifest.get("visual_audit")
+    if isinstance(audit, dict):
+        declared_ids = audit.get("source_visual_object_ids")
+        if not isinstance(declared_ids, list) or set(declared_ids) != set(ids):
+            violations.append({"field": "visual_audit.source_visual_object_ids", "reason": "audit must enumerate exactly the source visual inventory ids"})
+        if audit.get("expected_semantic_visuals") != len(semantic_ids):
+            violations.append({"field": "visual_audit.expected_semantic_visuals", "reason": "semantic visual count must be derived from visual_inventory", "expected": len(semantic_ids)})
+    return violations
+
+
 def is_full_slide_image(item, slide):
     width = float(slide.get("width", 13.333))
     height = float(slide.get("height", 7.5))
@@ -302,6 +372,8 @@ def quality_contract_violations(manifest):
                 violations.append({"field": f"visual_audit.{key}", "reason": "visual audit contains unresolved objects", "objects": value})
         if not str(visual_audit.get("review_notes", "")).strip():
             violations.append({"field": "visual_audit.review_notes", "reason": "must record concrete comparison evidence"})
+        if visual_audit.get("independent_review") is not True:
+            violations.append({"field": "visual_audit.independent_review", "reason": "source-versus-preview review must be explicitly recorded as an independent pass"})
 
     visible_text_count = 0
     for index, item in enumerate(manifest.get("text_boxes", [])):
@@ -364,6 +436,7 @@ def quality_contract_violations(manifest):
             )
 
     violations.extend(foreground_asset_contract_violations(manifest))
+    violations.extend(visual_inventory_contract_violations(manifest))
     return violations
 
 

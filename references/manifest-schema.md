@@ -74,6 +74,8 @@ Key fields:
   "rebuilt_arrows_connectors": 12,
   "expected_semantic_visuals": 8,
   "rebuilt_semantic_visuals": 8,
+  "source_visual_object_ids": ["visual-1", "visual-2"],
+  "independent_review": true,
   "missing_object_ids": [],
   "misaligned_object_ids": [],
   "review_notes": "Compared source.png, preview.png, and split_assets_contact.png at full resolution."
@@ -83,6 +85,17 @@ Key fields:
 Counts must be derived from the page inventory, not guessed from the final
 shape count. A missing arrow, icon, connector, or displaced text box is a
 failure even when the PPTX opens and the required titles are present.
+
+`source_visual_object_ids` must exactly equal the unique `id` values in
+`visual_inventory`. `expected_semantic_visuals` is derived from entries whose
+`role` is `foreground` or whose `object_type` is a semantic visual type; it may
+not be set to zero merely because the reconstructor omitted those objects.
+Every non-background `visual_inventory` entry must include `source_box_px` and
+`representation_ids`. A semantic visual must have `role: foreground`, and its
+`representation_ids` must include the ID of the image at its `path` in
+`images[]` with permitted asset provenance. `independent_review: true` records
+that source and preview were checked after the manifest was built; it is not a
+substitute for the exact ID and representation checks enforced by validation.
 
 `image_backend` is written by `editppt prepare` and may be overwritten by `editppt run backend` when needed. Parent-level backend selection policy lives in `SKILL.md` subsection "Image Backend Selection".
 
@@ -365,7 +378,7 @@ Text alignment:
 - `source_type`: exactly one of `asset-sheet-separated`, `imagegen`, `latex-rendered-formula`, `user-provided`, `user-approved-rasterization`. No other value passes validation.
 - `provenance_note`: a non-empty explanation of how the asset was produced.
 
-New `visual_inventory` entries should declare `role` (`foreground`, `background`, `structure`, or `formula`) and may supply `object_type` (such as `icon` or `photo`). For `role: foreground`, supply `path` matching an image and its `asset_provenance`, plus `source_type` matching that provenance (`asset-sheet-separated` or `imagegen`). Descriptions and provenance notes explain the work; they are not keyword-based proof of the source method. Legacy entries remain supported; prefer these fields for unambiguous classification.
+New `visual_inventory` entries must declare `id`, `role` (`foreground`, `background`, `structure`, or `formula`), `object_type`, `source_box_px`, and `representation_ids`. For `role: foreground`, supply `path` matching an image and its `asset_provenance`, plus `source_type` matching that provenance (`asset-sheet-separated` or `imagegen`). Descriptions and provenance notes explain the work; they are not keyword-based proof of the source method. Legacy free-form entries are no longer sufficient for a release-quality page because they cannot prove object coverage.
 
 `roundRect` shapes must record `source_corner_radius_px`; they may also record `corner_reason`. If the source is a straight-corner rectangle, use `rect`.
 
