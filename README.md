@@ -1,5 +1,7 @@
 # Image to Editable PPT
 
+> 文档责任：面向首次了解项目的读者，说明产品定位、完整目标、能力边界和主要入口。维护义务：区分目标与已实现能力，保持入口有效。不承载：个人环境、临时运行状态和开发操作教程。
+
 把科研论文插图、流程图、幻灯片截图、扫描 PDF 和图片型 PPT/PPTX 重建为**对象级可编辑的 PowerPoint**，尽量保持原图的文字、布局、层级和视觉身份。输入有演讲备注时保留备注。
 
 这是一套由视觉 coding agent 使用的 skill，以及配套的 `editppt` 确定性 CLI。Agent 负责理解图片和编写对象清单；CLI 负责输入规范化、素材处理、PPTX 构建、验证和断点恢复。单独运行 `editppt prepare` 不会自动完成图片理解或重建。
@@ -21,8 +23,6 @@ curl -fsSL https://raw.githubusercontent.com/a-green-hand-jack/image-to-editable
 - 同时验证对象结构与真实 PPTX 渲染。程序预览、结构校验和视觉通过是不同的证据，不能相互替代。
 
 已有运行时支持输入准备、逐页任务、文字尺寸提示、图像素材分离处理、原生形状/渐变/路径/表格、公式素材、构建和结构检查。视觉质量仍需在真实案例上逐页验证；当前没有对下述 18 个案例的整体通过率声明。
-
-当前真实试跑记录：`PaperClaw_fig_2` 已由 headless Codex 完成，结构校验和 LibreOffice 渲染均通过；`PaperClaw_fig_5` 已启动独立试跑，尚未计入完成案例。运行日志和中间产物位于 `benchmark/runs/`（该目录不进入 Git）。
 
 ## 入口
 

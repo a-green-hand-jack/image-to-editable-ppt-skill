@@ -1,15 +1,13 @@
 # Coding agent 开发约束
 
+> 文档责任：面向 coding agent，规定开发入口、修改边界和硬约束。维护义务：与产品源码、文档分工和发布规则保持一致，不把个人任务扩大成产品契约。不替代用户教程或运行日志。
+
 先读 README.md 理解完整产品目标，再读 DEV.md；安装和操作以 USER.md 为准。
 
-优先利用 foundation model 的视觉理解与重建能力，保持自身编排轻量。优化以实际转换效果为依据；不要为了调度或状态管理扩张框架。传输 PPTX 到 MacBook 统一使用 `.agents/scripts/ppt-to-mac`，不要临时编写传输胶水。
+修改文档前读取 [.agents/memory/document-responsibilities.md](.agents/memory/document-responsibilities.md)，按读者和责任安排正文，保留可见的责任文档头。
 
-- 产品完整且唯一来源是 `src/editppt/`，产品 skill 位于 `src/editppt/skills/image-to-editable-ppt/`。不得在根目录或 `.agents/` 维护第二份产品实现。
-- `.agents/` 是开发平面，绝不进入 wheel/sdist 或运行依赖。开发测试在 `.agents/tests/`；开源参考及采纳边界在 `.agents/references/`。
-- `benchmark/*.png` 是固定评测输入。保留原名和原始字节，新增或替换案例需明确来源并更新哈希；不得覆写为重建输出。
-- 通过现有 `editppt` CLI 执行准备、构建、状态和恢复；不要绕过状态机或自建运行/监控框架。测试可以直接验证纯函数及产物。
-- manifest 是构建源；完整保留文字、结构与前景对象。禁止整页截图覆盖、隐藏文本占位、虚报对象数量或伪造通过证据。
-- 程序 preview 不等于真实 PPTX 渲染，结构通过不等于视觉通过。报告未执行的案例和失败，不以准备、安装或 smoke 检查声称重建成功。
-- 参考开源 skill 时记录固定 revision、license 和实际采纳的设计；不能把只公开可读的专有材料当作开源代码复制。
-- 后端、模型和凭据为用户/运行配置，不硬编码当前机器事实。绝不读取或输出凭据文件内容。
-- 验证与变更风险相称；布局/打包变更至少检查 CLI、产品资源完整性及 wheel/sdist 排除边界。提交、推送或发布只在用户明确要求时执行。
+优先利用 foundation model 的视觉理解与重建能力，保持自身编排轻量。产品平面、开发平面和渐进式读取规则详见 [.agents/AGENTS.md](.agents/AGENTS.md)。
+
+- 不得把个人设备、私有路径或一次性工作流写成产品契约。
+- 不得读取、输出或提交凭据；提交、推送或发布只在用户明确要求时执行。
+- 报告结果时区分准备、结构验证、真实渲染和最终交付，不把未执行步骤声称为成功。

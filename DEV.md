@@ -1,5 +1,7 @@
 # 开发指南
 
+> 文档责任：面向维护者和贡献者，说明结构、架构、开发目标、验证和发布方式。维护义务：保持源码、验证与发布边界一致，开发方法不依赖个人设备配置。不承载：用户教程、个人运维流程和临时运行结果。
+
 ## 两个平面
 
 `src/editppt/` 是产品运行时完整且唯一的源码，Python 包名为 `editppt`，发行名为 `image-to-editable-ppt-cli`。其中 `skills/image-to-editable-ppt/` 包含 `SKILL.md`、提示模板、引用文档、提示生成脚本及 UI 元数据，随 wheel 分发。产品不得读取仓库根目录或 `.agents/` 才能工作。
@@ -20,8 +22,6 @@
 6. `run record` 验证并记录文件哈希，`run finalize` 从 manifest 重建最终 deck 并检查结构和来源。
 
 多页 deck 共用一套画布，按各页 `content_box` 等比放入。benchmark 图片比例各异，正式对比应一图一个 run，避免合并画布影响结果。
-
-端到端验收以 headless Codex 为准：当前 `PaperClaw_fig_2` 已有结构与 LibreOffice 实际渲染证据；`PaperClaw_fig_5` 仍是进行中的独立试跑。不要把父会话手工草稿、仅有 `page.pptx`、程序 preview 或准备阶段日志记为完成。
 
 ## 开发与验证
 
@@ -49,13 +49,9 @@ PYTHONPATH=src /path/to/python -m unittest discover -s .agents/tests -v
 
 每次案例优化保留输入哈希、代码版本、使用的模型/后端、manifest、PPTX、程序预览、真实渲染及失败原因。对比结构可编辑性、文本准确性、对象覆盖和渲染保真度；像素相似度不能单独代表成功。只修复实际观察到的失败，不能把单个成功案例推广为全案例通过。
 
-当前首个 headless 成功案例的交付物位于 `benchmark/runs/headless-20260915/fig2/`：最终 PPTX、`conversion/final/validation.json`、页面 manifest、LibreOffice 渲染和 `events-resumed.jsonl`。这是可复现证据样例，不是发布包内容。
-
 端到端案例必须由独立的 headless Codex 进程加载产品 skill，仅接收原始 PNG 和输出要求完成。父会话手写 manifest 或提供对象答案只能算调试，不能替代端到端证据。任务目录的 `.agents/skills/` 可通过符号链接挂载 `src/` 下的产品 skill；它不是第二份产品源码，也不进入发布物。保留 `codex exec --json` 日志和最终回复，若中途人工修复或续跑，明确记录边界。
 
 ## 安装与发布
-
-开发预览的一键传输命令为 `.agents/scripts/ppt-to-mac <file.pptx> [more.pptx] --open`。它通过 SSH/SFTP 发送到 MacBook 并核对 SHA-256，默认保存在原 I2P 图片目录下的 `converted-pptx/`。支持 `--dest`、`--host`（或 `EDITPPT_MAC_DEST` / `EDITPPT_MAC_HOST`）、`--dry-run`。同名同内容跳过，同名不同内容拒绝覆盖，除非明确传入 `--overwrite`。`--open` 只在传输核验成功后用 Microsoft PowerPoint 打开。脚本属于开发平面，不随产品发布。
 
 最终用户使用根目录的 `install.sh`：它从 GitHub 下载指定 ref，安装 CLI，并注册 Codex skill。开发者在本地 checkout 中可使用 `uv tool install --force --editable .`；`.agents/scripts/install.sh` 只服务于已有 checkout，不是公开的一键安装入口。修改源码后重新安装或使用 editable 安装。
 

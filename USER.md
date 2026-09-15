@@ -1,5 +1,7 @@
 # 使用说明
 
+> 文档责任：面向产品用户，说明安装、使用、输出观察和故障恢复。维护义务：说明运行前提，示例不依赖作者的设备或私有工具，明确完成条件与限制。不承载：架构、开发测试、评测日志和个人运维流程。
+
 ## 一键安装
 
 ```bash
@@ -30,7 +32,7 @@ codex exec -C "$PWD/conversion" --approve-for-me \
   > "$PWD/conversion/events.jsonl" 2> "$PWD/conversion/stderr.log"
 ```
 
-使用受管 provider 时，将 `codex exec` 换成现有的 `ai codex exec`。`--approve-for-me` 仍遵守运行时安全策略；不要把 API key 写进命令或仓库。
+`--approve-for-me` 仍遵守 Codex 运行时安全策略；不要把 API key 写进命令或仓库。
 
 最终结果通常位于 `<workdir>/run/final/origin_edited.pptx`。只有同时具备最终 PPTX、结构验证和真实渲染记录，才算完成。
 
@@ -43,14 +45,6 @@ editppt run status ./run
 ```
 
 `editppt` 是确定性构建工具，不会自己理解图片；后续重建由 Codex skill 驱动。OCR 不可用时可以使用离线几何提示，但模型仍必须直接阅读原图。
-
-## 传输到 MacBook
-
-```bash
-.agents/scripts/ppt-to-mac result.pptx --open
-```
-
-默认保存到 `/Users/jieke/Pictures/poster/参考测试/I2P/converted-pptx/`，支持 `--dest` 指定其他位置。相同文件会跳过，不同内容不会覆盖，除非显式使用 `--overwrite`。
 
 ## 故障恢复
 
