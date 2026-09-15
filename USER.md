@@ -55,9 +55,13 @@ codex exec -C "$PWD/conversion" --approve-for-me \
 editppt doctor
 editppt prepare input.png --job-dir ./run
 editppt run status ./run
+# 查看最近 10 条 agent/命令事件
+editppt run status ./run --events 10
 ```
 
 `editppt` 是确定性构建工具，不会自己理解图片；后续重建由 Codex skill 驱动。OCR 不可用时可以使用离线几何提示，但模型仍必须直接阅读原图。
+
+`editppt run status` 会同时显示页面状态、运行状态年龄和最近事件摘要。若页面长期保持 `dispatched`，用 `--events 20` 检查最后一个命令；事件仍在更新表示 agent 仍在工作，事件和文件都长时间不更新才需要恢复或检查进程。
 
 ## 故障恢复
 

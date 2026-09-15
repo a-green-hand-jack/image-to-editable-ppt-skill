@@ -189,6 +189,8 @@ def cmd_status(args: argparse.Namespace) -> int:
     argv = [args.run]
     if args.json:
         argv.append("--json")
+    if args.events is not None:
+        argv.extend(["--events", str(args.events)])
     return run_script("page_job_status.py", argv)
 
 
@@ -537,6 +539,7 @@ record dispatch/result events, and assemble the final deck.
     )
     status.add_argument("run", metavar="RUN", help="Run directory or deck_manifest.json path.")
     status.add_argument("--json", action="store_true", help="Print machine-readable JSON.")
+    status.add_argument("--events", type=int, default=5, metavar="N", help="Show the N most recent event summaries (default: 5; 0 disables).")
     status.set_defaults(func=cmd_status)
 
     backend = run_sub.add_parser(

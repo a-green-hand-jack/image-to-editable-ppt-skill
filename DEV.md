@@ -25,6 +25,8 @@
 
 多页 deck 共用一套画布，按各页 `content_box` 等比放入。benchmark 图片比例各异，正式对比应一图一个 run，避免合并画布影响结果。
 
+`editppt run status <run> [--json] [--events N]` 是运行观测入口：除 `page_jobs.json` 的页面状态外，还读取同级 headless 运行的 `events.jsonl`，报告最近命令/agent 消息和 run-state 年龄。它是只读诊断，不修改状态；不要另建平行监控状态机。事件持续更新而页面仍为 `dispatched` 通常表示页面 agent 正在进行素材、manifest、构建或渲染阶段。
+
 ## 开发与验证
 
 先检查已有兼容 Python 环境；没有时使用 `uv sync --locked` 建立项目 `.venv`。常规开发命令：
