@@ -1,0 +1,23 @@
+%% 文档责任：说明 image-to-editable-ppt 从光栅输入到对象级可编辑 PPTX 的产品流程。
+%% 维护义务：保持节点与产品 skill、editppt CLI 的实际职责一致；不记录个人设备或临时运行状态。
+flowchart LR
+    A[PNG 光栅图] --> B[headless Codex 挂载 image-to-editable-ppt skill]
+    B --> C[editppt prepare\n规范化输入、画布、页面任务]
+    C --> D[Foundation model 视觉理解\n识别文字、布局、图形、层级与视觉对象]
+    D --> E[页面 manifest.json\n对象类型、源坐标、文字、素材来源]
+    E --> F{视觉对象类型}
+    F -->|文字/面板/线条/箭头/表格| G[原生 PowerPoint 对象]
+    F -->|复杂图标/照片/插画| H[图像后端分离为独立素材]
+    F -->|简单扁平 pictogram| I[审计型原生近似\n记录 source_fidelity=approximate]
+    G --> J[editppt page build\n确定性生成 OOXML/PPTX]
+    H --> J
+    I --> J
+    J --> K[程序预览 + 真实 Office/LibreOffice 渲染]
+    K --> L[源图与渲染对比\n修正布局、字号、对象覆盖与层级]
+    L --> E
+    K --> M[结构验证\n对象、文本、来源、资产哈希]
+    M --> N[editppt run record]
+    N --> O[editppt run finalize]
+    O --> P[对象级可编辑 PPTX]
+
+    Q[运行时 provider 配置\nEDITPPT_IMAGE_BACKEND + API endpoint/model] -.-> H

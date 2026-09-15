@@ -22,6 +22,22 @@ curl -fsSL https://raw.githubusercontent.com/a-green-hand-jack/image-to-editable
 - `manifest.json` 是逐页及最终 PPTX 的唯一构建依据。素材、坐标、来源和校验信息随运行保留，失败可以定位和恢复。
 - 同时验证对象结构与真实 PPTX 渲染。程序预览、结构校验和视觉通过是不同的证据，不能相互替代。
 
+## 工作流程
+
+从 PNG 到可编辑 PPTX 的产品流程如下：
+
+可渲染的 Mermaid 源文件见 [docs/skill-flow.mmd](docs/skill-flow.mmd)。核心原则是让 foundation model 负责视觉理解与重建判断，让 `editppt` 负责确定性的输入准备、素材处理、PPTX 构建、验证和最终组装。
+
+```mermaid
+flowchart LR
+    A[PNG] --> B[Foundation model 视觉理解]
+    B --> C[manifest.json 对象清单]
+    C --> D[editppt 确定性构建]
+    D --> E[真实渲染与结构验证]
+    E --> F[可编辑 PPTX]
+    E -.修正反馈.-> B
+```
+
 已有运行时支持输入准备、逐页任务、文字尺寸提示、图像素材分离处理、原生形状/渐变/路径/表格、公式素材、构建和结构检查。视觉质量仍需在真实案例上逐页验证；当前没有对 18 个固定案例作整体通过率声明。已知端到端证据包括 `auto_reseach_ai_fig_1` 的结构验证和真实渲染完成，以及 `PaperClaw_fig_2` 的结构验证完成但真实 Office 渲染未得到有效输出。`AutoSOTA_fig2`、`AutoSOTA_fig5`、`PaperClaw_fig_1` 和 `the_ai_scientist_v2_fig_1` 的 2026-09-16 运行记录仍是阻塞，不应视为成功。
 
 图像素材后端通过运行时配置选择，不隐式绑定开发机的 Codex OAuth。可移植的 headless 运行应在子进程中显式设置 `EDITPPT_IMAGE_BACKEND=api`、`OPENAI_BASE_URL`、`OPENAI_API_KEY` 和 `IMAGE_TO_EDITABLE_PPT_IMAGE_MODEL`；`codex-oauth` 只适用于明确授权的设备本地 OAuth。后端故障时，简单且几何明确的扁平 pictogram 可以按审计规则使用原生近似；照片、复杂插画、纹理和 logo 仍必须保留合规的独立图像资产。
