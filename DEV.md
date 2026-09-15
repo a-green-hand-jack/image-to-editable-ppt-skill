@@ -57,6 +57,6 @@ PYTHONPATH=src /path/to/python -m unittest discover -s .agents/tests -v
 
 开发预览的一键传输命令为 `.agents/scripts/ppt-to-mac <file.pptx> [more.pptx] --open`。它通过 SSH/SFTP 发送到 MacBook 并核对 SHA-256，默认保存在原 I2P 图片目录下的 `converted-pptx/`。支持 `--dest`、`--host`（或 `EDITPPT_MAC_DEST` / `EDITPPT_MAC_HOST`）、`--dry-run`。同名同内容跳过，同名不同内容拒绝覆盖，除非明确传入 `--overwrite`。`--open` 只在传输核验成功后用 Microsoft PowerPoint 打开。脚本属于开发平面，不随产品发布。
 
-从仓库根目录运行 `bash .agents/scripts/install.sh` 可安装 CLI；它使用本地源码，不自动拉取或删除仓库。产品 skill 的安装路径见 USER.md。修改源码后重新安装或使用 editable 安装。
+最终用户使用根目录的 `install.sh`：它从 GitHub 下载指定 ref，安装 CLI，并注册 Codex skill。开发者在本地 checkout 中可使用 `uv tool install --force --editable .`；`.agents/scripts/install.sh` 只服务于已有 checkout，不是公开的一键安装入口。修改源码后重新安装或使用 editable 安装。
 
 发行前运行上述检查，执行 `uv build` 产生 wheel/sdist。wheel 内 `editppt/skills/image-to-editable-ppt/` 是 skill 发布来源，仓库根的文档及 `.agents/` 不作为产品运行依赖。发布目标和渠道由具体发布请求决定；提交、推送和上传不会由构建或安装脚本自动执行。

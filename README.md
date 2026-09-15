@@ -4,7 +4,13 @@
 
 这是一套由视觉 coding agent 使用的 skill，以及配套的 `editppt` 确定性 CLI。Agent 负责理解图片和编写对象清单；CLI 负责输入规范化、素材处理、PPTX 构建、验证和断点恢复。单独运行 `editppt prepare` 不会自动完成图片理解或重建。
 
-主要使用方式是 **headless Codex 加载 skill，输入 PNG，输出 PPTX**。图片理解、对象重建和视觉修正由该进程中的 foundation model 完成，调用者不需要手工编写 manifest。挂载和执行命令见 [USER.md](USER.md#headless-codexpng--pptx)。
+主要使用方式是 **headless Codex 加载 skill，输入 PNG，输出 PPTX**。图片理解、对象重建和视觉修正由该进程中的 foundation model 完成，调用者不需要手工编写 manifest。挂载和执行命令见 [USER.md](USER.md#headless-cli)。
+
+最终用户可以直接一键安装：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/a-green-hand-jack/image-to-editable-ppt-skill/main/install.sh | bash
+```
 
 ## 完整目标形态
 
