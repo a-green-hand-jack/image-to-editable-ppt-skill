@@ -15,3 +15,11 @@
 - 通用路径（如用户目录下的标准安装位置）、仓库相对源码路径和官方公开项目地址可以保留；作者的用户名、设备路径、SSH 别名、私有启动器及具体会话输出路径不能成为公共教程的前提。
 - 临时评测状态留在对应运行记录；DEV 描述如何验证，不把一次试跑写成所有用户可复现的产品保证。
 - 交付前检查正文是否符合责任声明、是否依赖个人环境、是否夹带运行日志，不能以文档字数减少代替边界检查。
+
+## 2026-09-16 图像后端阻塞教训
+
+5 个 headless 案例中，多个页面在同一个 `editppt image edit` 外部后端因 DNS 失败而停止；原 skill 对所有前景视觉对象都要求 asset-sheet 分离，且没有前置 backend preflight 或简单图标退路。后续 skill 应先记录工具可用性、端点可达性和上传授权；复杂 artwork 继续阻塞，简单扁平 pictogram 可在明确标记 `native-approximate`、对象级表示和视觉差异的前提下继续构建。不能把网络失败伪装成成功，也不能因复杂对象阻塞而放弃整页中其余可重建内容。
+
+## 2026-09-16 Provider 注入边界
+
+skill 运行时不应隐式继承开发机的 Codex OAuth provider。图像后端必须允许进程级显式选择：`EDITPPT_IMAGE_BACKEND=api` 配合 `OPENAI_BASE_URL`、`OPENAI_API_KEY` 和 `IMAGE_TO_EDITABLE_PPT_IMAGE_MODEL` 使用 OpenAI-compatible provider；`codex-oauth` 仅在明确授权设备本地 OAuth 时使用。当前 Apex GPT catalog 的已知可用模型为 `gpt-5.5`、`gpt-5.6-luna`、`gpt-5.6-sol`、`gpt-5.6-terra`、`gpt-6-astra` 和 `codex-auto-review`；catalog 与配额会漂移，运行前应通过受管 launcher 复核，不写入密钥或固定开发机事实。

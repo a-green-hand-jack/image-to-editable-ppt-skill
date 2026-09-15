@@ -10,6 +10,8 @@ Every `source.png` is judged in three steps, in this order:
 
 The order exists because steps 1-2 decide object sources and step 3 consumes those decisions. Nativizing text and layout first locks in wrong choices: text that belongs to a logo, a UI screenshot, or a to-be-separated asset must not become a native text box, and which text needs clean-base removal depends on the background decision. Define the boundaries between background, foreground, and native structure first; then write the manifest. Submit image jobs serially through `page_request.json.image_backend`; its field contract lives in `manifest-schema.md`, and fallback CLI syntax lives in `cli-helper.md`. Do not parallelize page-local image jobs through a batch interface because concurrent asset-sheet calls make rate limits, retries, and reconciliation failures harder to diagnose.
 
+Before step 2, run a backend preflight and record: callable local/built-in tools, configured endpoint reachability, upload authorization, and the affected objects if unavailable. Do not spend multiple retries on DNS or permission failures. A page may continue with native reconstruction for simple, source-grounded pictograms; complex artwork still requires a compliant image source.
+
 Contents:
 
 - Common failure mode: false progress
@@ -22,7 +24,7 @@ Contents:
 
 ## Common Failure Mode: False Progress
 
-First establish that the foreground workflow in section 2.1 is feasible; if it is blocked, report that failure before building a replacement page. Passing structural validation never waives the object-source rules.
+Before foreground work, preflight the available image backend and upload authorization. Do not spend repeated retries on DNS or permission failures. If complex separation is blocked, report that affected object; simple flat pictograms may use section 2.4. Passing structural validation never waives the object-source rules.
 
 ## Pre-Decision: Page Inventory
 
@@ -109,9 +111,21 @@ Every non-text foreground visual object must be separated through the image-edit
 - Semantic small icons, trend icons, warning symbols, and status symbols in dashboards or charts.
 - Leaves, plants, people, animals, computers, phones, devices, scene illustrations, and any other non-text object that carries page style.
 
-Do not approximate these with native primitives, even when one appears to be made of circles, lines, rectangles, or ellipses — the criterion is not "can it be drawn" but whether it is a foreground visual asset rather than a layout primitive. Do not substitute direct source-image snippets for source-faithful separation. Do not hand-draw or assemble foreground visual objects with local Python/Pillow/SVG/HTML/CSS code; deterministic tools are only for normalization, recording, background removal, splitting, formula rendering, building, validation, and QA.
+Do not approximate complex or identity-bearing assets with native primitives. Do not substitute direct source-image snippets for source-faithful separation. Do not hand-draw complex foreground objects with local Python/Pillow/SVG/HTML/CSS code; deterministic tools are only for normalization, recording, background removal, splitting, formula rendering, building, validation, and QA. Simple flat pictograms may use section 2.4 when the backend is unavailable.
 
-There is no fallback path. If asset-sheet separation cannot produce a compliant asset, the page is blocked until the asset workflow is fixed or the user explicitly changes the requirements for that exact object. Do not downgrade the missing separation to a warning; do not record, finalize, or deliver the fallback.
+For complex foreground artwork there is no fallback path: if asset-sheet separation cannot produce a compliant asset, the affected object and page remain blocked until the asset workflow is fixed or the user explicitly changes the requirement. For simple flat pictograms only, use the native fallback described below when the source geometry is unambiguous; never use it for logos, textured artwork, photos, or semantic marks whose identity would be materially altered.
+
+### 2.4 Native fallback for simple pictograms
+
+When the backend preflight fails, a simple pictogram may be reconstructed with native lines, rectangles, ellipses, polygons, and fills if all of these hold:
+
+- the source has flat colors and no texture, gradients, photographic detail, or irregular brushwork;
+- the primitive decomposition is visually evident from the source;
+- each repeated instance is represented separately and its source coordinates are recorded;
+- the manifest marks the object as `source_fidelity: approximate` and records the backend failure in `visual_audit.review_notes`;
+- the final report names the approximation instead of claiming source-faithful asset separation.
+
+This fallback exists to keep a page with otherwise native content useful; it is not permission to redraw complex or identity-bearing artwork.
 
 ### 2.2 Asset Sheet Prompt Principles
 

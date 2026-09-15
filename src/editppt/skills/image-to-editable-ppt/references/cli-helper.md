@@ -8,6 +8,8 @@ Usage principles:
 - When full CLI parameters are needed, read `editppt <command> --help` or `editppt image <command> --help` first.
 - In network-restricted agents, configured OCR and CLI image calls may require network approval. Follow `SKILL.md` execution boundaries and prepare instructions.
 
+Image backend selection is explicit per process: `EDITPPT_IMAGE_BACKEND=api` forces the OpenAI-compatible API configured by `OPENAI_BASE_URL` and `OPENAI_API_KEY`; `EDITPPT_IMAGE_BACKEND=codex-oauth` forces the device-local Codex OAuth Images endpoint; `auto` tries Codex OAuth first and then the API fallback.
+
 ## Command Tree
 
 ```text

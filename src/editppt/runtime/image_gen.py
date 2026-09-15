@@ -45,7 +45,7 @@ MAX_IMAGE_BYTES = 50 * 1024 * 1024
 DEFAULT_CONFIG_HOME = "~/.editppt"
 DEFAULT_CODEX_AUTH_FILE = "~/.codex/auth.json"
 DEFAULT_CODEX_IMAGES_BASE_URL = "https://chatgpt.com/backend-api/codex"
-ENV_FIELDS = ("OPENAI_API_KEY", "OPENAI_BASE_URL", "IMAGE_TO_EDITABLE_PPT_IMAGE_MODEL")
+ENV_FIELDS = ("OPENAI_API_KEY", "OPENAI_BASE_URL", "IMAGE_TO_EDITABLE_PPT_IMAGE_MODEL", "EDITPPT_IMAGE_BACKEND")
 MAX_CODEX_RESPONSE_BYTES = 64 * 1024 * 1024
 MAX_CODEX_BASE64_CHARS = 64 * 1024 * 1024
 CHATGPT_AUTH_CLAIM = "https://api.openai.com/auth"
@@ -53,6 +53,9 @@ CHATGPT_ACCOUNT_ID_CLAIM = "chatgpt_account_id"
 
 IMAGE_HELP_EPILOG = """\
 Backend selection:
+  Set EDITPPT_IMAGE_BACKEND=api to force the configured OpenAI-compatible API,
+  or =codex-oauth to force the Codex OAuth Images endpoint. Default=auto uses
+  Codex OAuth first and API fallback second.
   Codex OAuth: uses ~/.codex/auth.json or CODEX_AUTH_FILE.
   API fallback: uses OPENAI_API_KEY, OPENAI_BASE_URL, and
   IMAGE_TO_EDITABLE_PPT_IMAGE_MODEL from the environment or ~/.editppt/config.yaml.
@@ -576,6 +579,11 @@ def _run_codex_image(
     output_paths: List[Path],
     endpoint_label: str,
 ) -> bool:
+    backend = os.getenv("EDITPPT_IMAGE_BACKEND", "auto").strip().lower()
+    if backend not in {"auto", "codex-oauth", "api"}:
+        _die("EDITPPT_IMAGE_BACKEND must be auto, codex-oauth, or api.")
+    if backend == "api":
+        return False
     if not _codex_available():
         return False
     operation = "edit" if image_paths else "generate"

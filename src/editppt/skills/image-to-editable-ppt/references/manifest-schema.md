@@ -382,10 +382,10 @@ Text alignment:
 
 - `path`: the image path as referenced in `images[]`.
 - `source`: the file the asset was produced from (for separated assets and clean bases this is typically `source.png` or the recorded asset sheet; for formulas the `.tex` file). The referenced file must exist.
-- `source_type`: exactly one of `asset-sheet-separated`, `imagegen`, `latex-rendered-formula`, `user-provided`, `user-approved-rasterization`. No other value passes validation.
+- `source_type`: exactly one of `asset-sheet-separated`, `imagegen`, `latex-rendered-formula`, `user-provided`, `user-approved-rasterization`, or `native-approximate`. The last value is only for a simple flat pictogram represented by native shapes after a recorded image-backend outage; it requires a warning in `visual_audit.review_notes` and does not claim source-faithful separation.
 - `provenance_note`: a non-empty explanation of how the asset was produced.
 
-New `visual_inventory` entries must declare `id`, `role` (`foreground`, `background`, `structure`, or `formula`), `object_type`, `source_box_px`, and `representation_ids`. For `role: foreground`, supply `path` matching an image and its `asset_provenance`, plus `source_type` matching that provenance (`asset-sheet-separated` or `imagegen`). Descriptions and provenance notes explain the work; they are not keyword-based proof of the source method. Legacy free-form entries are no longer sufficient for a release-quality page because they cannot prove object coverage.
+New `visual_inventory` entries must declare `id`, `role` (`foreground`, `background`, `structure`, or `formula`), `object_type`, `source_box_px`, and `representation_ids`. For complex `role: foreground` assets, supply `path` matching an image and its `asset_provenance`, plus `source_type` matching that provenance (`asset-sheet-separated` or `imagegen`). A simple flat pictogram may instead declare `source_type: native-approximate` and point its `representation_ids` to native shapes; record the backend failure and approximation in `visual_audit.review_notes`. Descriptions and provenance notes explain the work; they are not keyword-based proof of the source method. Legacy free-form entries are no longer sufficient for a release-quality page because they cannot prove object coverage.
 
 `roundRect` shapes must record `source_corner_radius_px`; they may also record `corner_reason`. If the source is a straight-corner rectangle, use `rect`.
 

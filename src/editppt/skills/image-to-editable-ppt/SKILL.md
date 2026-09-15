@@ -25,6 +25,8 @@ A single-page run is reconstructed by the current agent after `dispatch --local`
 
 Use only the task's inputs and user-configured services. Respect local-only/confidential constraints and runtime permissions. Conversion authorization does not authorize sending unrelated files or changing global providers. Keep secrets out of prompts, manifests, logs, and outputs. Do not hard-code a machine, endpoint, or vision model into the workflow.
 
+The image backend is runtime configuration, not part of the skill's identity. For a provider-independent headless run, set `EDITPPT_IMAGE_BACKEND=api`, `OPENAI_BASE_URL`, `OPENAI_API_KEY`, and `IMAGE_TO_EDITABLE_PPT_IMAGE_MODEL` in the child process. Use `EDITPPT_IMAGE_BACKEND=codex-oauth` only when device-local Codex OAuth Images is intentionally authorized; default `auto` is convenient for interactive development but must not be assumed by a portable run. Never print or persist the key.
+
 ## 1. Prepare
 
 Check `editppt --help`; follow the CLI reference if installation is needed.
@@ -37,7 +39,9 @@ Prepare writes deck/page jobs, notes, source images, requests, and advisory text
 
 OCR is optional. With no configured token, continue using the offline geometry hints and direct visual transcription; do not interrupt to require signup, promise free quotas, or claim geometry hints recognize text. Empty or inaccurate hints never justify omitting text. Measure glyph height and preserve source text levels as the page prompt specifies. Configured OCR may be used within the user's data-processing constraints; report failures and distinguish offline hints from recognized text. `--no-text-hints` skips hint generation when required. Never ask the user to paste credentials into chat.
 
-For required image jobs, inspect the callable tools. If the runtime exposes the recorded built-in image tool, prepare with `--image-backend builtin-imagegen`; otherwise use the CLI backend contract. Run page-local image jobs serially. Built-in first and allowed CLI fallback events/order are defined by `page_request.json.image_backend` and the manifest reference. Never invent tool availability, provenance, or successful generation. If compliant separation remains impossible, preserve progress and report the affected objects.
+For required image jobs, preflight the callable tools before writing a manifest: identify whether a local/built-in image editor is available, whether the configured external backend is reachable, and whether the current task authorizes sending source pixels to it. Record the result in the run evidence. If the runtime exposes the recorded built-in image tool, prepare with `--image-backend builtin-imagegen`; otherwise use the CLI backend contract. Run page-local image jobs serially. Built-in first and allowed CLI fallback events/order are defined by `page_request.json.image_backend` and the manifest reference. Never invent tool availability, provenance, or successful generation.
+
+If an image backend is unavailable, do not block an entire page solely because of simple flat pictograms that can be represented by a small, source-grounded set of native PowerPoint primitives. Such objects may use native fallback only when their geometry, count, colors, and placement are unambiguous; record `source_fidelity: approximate`, the backend failure, and the affected object IDs, and report the limitation. Complex artwork, photos, textured marks, logos, and objects whose identity would be materially changed remain blocked rather than approximated. A backend outage must therefore degrade only the affected objects, not silently flatten or abandon an otherwise reconstructable page.
 
 ## 2. Claim or dispatch pages
 

@@ -23,6 +23,7 @@ ALLOWED_SOURCE_TYPES = {
     "latex-rendered-formula",
     "user-provided",
     "user-approved-rasterization",
+    "native-approximate",
 }
 REQUIRED_QUALITY_CHECKS = {
     "font_size_calibrated",
@@ -190,7 +191,7 @@ def has_forbidden_decision(decision):
 
 def foreground_asset_contract_violations(manifest):
     violations = []
-    allowed_foreground_sources = {"asset-sheet-separated", "imagegen"}
+    allowed_foreground_sources = {"asset-sheet-separated", "imagegen", "native-approximate"}
     provenance_by_path = {
         Path(entry["path"]).as_posix(): entry
         for entry in manifest.get("asset_provenance", [])
@@ -208,7 +209,7 @@ def foreground_asset_contract_violations(manifest):
         decision = item.get("decision", "") if isinstance(item, dict) else item
         declared_source = item.get("source_type") if isinstance(item, dict) else None
         if (not structured and has_forbidden_decision(decision)) or (declared_source is not None and declared_source not in allowed_foreground_sources):
-            violations.append({"field": field, "reason": "foreground visual decisions must not use direct crops, native approximations, emoji/text symbols, or warning-only fallbacks"})
+            violations.append({"field": field, "reason": "foreground visual decisions must use separated assets or an explicitly recorded native-approximate fallback"})
         path = visual_item_path(item)
         if path:
             foreground_paths.add(path)
@@ -217,8 +218,8 @@ def foreground_asset_contract_violations(manifest):
                 violations.append({"field": field, "path": path, "reason": "foreground visual objects require matching asset-sheet-separated or imagegen provenance"})
             elif declared_source is not None and declared_source != provenance.get("source_type"):
                 violations.append({"field": field + ".source_type", "path": path, "reason": "source_type must match the linked asset provenance"})
-        elif structured:
-            violations.append({"field": field, "reason": "structured foreground visual objects require an asset path linked to provenance"})
+        elif structured and declared_source != "native-approximate":
+            violations.append({"field": field, "reason": "structured foreground visual objects require an asset path unless native-approximate is explicitly recorded"})
         elif not contains_any(str(decision), ASSET_SHEET_TERMS) or not any(
             entry.get("source_type") in allowed_foreground_sources for entry in provenance_by_path.values()
         ):
@@ -286,6 +287,8 @@ def visual_inventory_contract_violations(manifest):
                 violations.append({"field": field + ".role", "reason": "semantic visual objects must be foreground assets, not structural shapes"})
             path = visual_item_path(item)
             matching_ids = image_ids_by_path.get(path, set()) if path else set()
+            if item.get("source_type") == "native-approximate":
+                continue
             if not matching_ids:
                 violations.append({"field": field, "reason": "semantic visuals require a matching manifest image asset with an id"})
             elif not isinstance(item.get("representation_ids"), list) or not matching_ids.intersection(item["representation_ids"]):
