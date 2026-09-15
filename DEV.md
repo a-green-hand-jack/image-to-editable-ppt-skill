@@ -21,6 +21,8 @@
 5. 外部 LibreOffice/PowerPoint 渲染真实 PPTX，agent 比对源图。`validate_pptx.py` 检查结构及声明的对象覆盖，不自动判断视觉相似度。
 6. `run record` 验证并记录文件哈希，`run finalize` 从 manifest 重建最终 deck 并检查结构和来源。
 
+图像 provider 是运行时边界，不是产品 skill 的固定身份。`EDITPPT_IMAGE_BACKEND=api` 配合 `OPENAI_BASE_URL`、`OPENAI_API_KEY` 和 `IMAGE_TO_EDITABLE_PPT_IMAGE_MODEL` 可接入任意 OpenAI-compatible provider；`codex-oauth` 仅用于明确授权的设备本地后端。开发和评测必须记录实际 backend、模型标签和失败层级，但不得记录密钥。开始需要图像分离的页面前先做 backend preflight：工具可用性、端点可达性和源图上传授权缺一不可。
+
 多页 deck 共用一套画布，按各页 `content_box` 等比放入。benchmark 图片比例各异，正式对比应一图一个 run，避免合并画布影响结果。
 
 ## 开发与验证
@@ -48,6 +50,8 @@ PYTHONPATH=src /path/to/python -m unittest discover -s .agents/tests -v
 当前重点是科学图的保真重建：文字字号和折行、重复图标一一对应、曲线/箭头与分支完整、原生表格、透明边缘以及真实 PPTX 中的字体和对象布局。沿用现有素材来源合同，不把开源参考中的整组截图或近似图标替换引入默认流程。
 
 每次案例优化保留输入哈希、代码版本、使用的模型/后端、manifest、PPTX、程序预览、真实渲染及失败原因。对比结构可编辑性、文本准确性、对象覆盖和渲染保真度；像素相似度不能单独代表成功。只修复实际观察到的失败，不能把单个成功案例推广为全案例通过。
+
+截至 2026-09-16 的开发证据：`auto_reseach_ai_fig_1` 已完成结构验证和 LibreOffice 渲染；`PaperClaw_fig_2` 已完成结构验证，但其 LibreOffice 尝试未产生可用 PDF，因此 Office 渲染仍未验证。`AutoSOTA_fig2`、`AutoSOTA_fig5`、`PaperClaw_fig_1` 和 `the_ai_scientist_v2_fig_1` 的运行在图像素材阶段阻塞或未完成，原始失败证据保留在各自 `benchmark/runs/` 目录中。这些记录是开发证据，不是产品成功率承诺。
 
 端到端案例必须由独立的 headless Codex 进程加载产品 skill，仅接收原始 PNG 和输出要求完成。父会话手写 manifest 或提供对象答案只能算调试，不能替代端到端证据。任务目录的 `.agents/skills/` 可通过符号链接挂载 `src/` 下的产品 skill；它不是第二份产品源码，也不进入发布物。保留 `codex exec --json` 日志和最终回复，若中途人工修复或续跑，明确记录边界。
 

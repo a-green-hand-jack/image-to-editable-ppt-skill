@@ -18,6 +18,19 @@ curl -fsSL https://raw.githubusercontent.com/a-green-hand-jack/image-to-editable
 
 模型会读取图片、生成对象清单、调用 `editppt`、验证结构并完成 PPTX。复杂插画可以保留为独立可选图片，但不能声称其内部笔画仍是矢量可编辑的。
 
+## 图像后端配置
+
+headless 或跨机器运行时，应显式选择图像后端，避免继承启动机器的隐式 OAuth：
+
+```bash
+export EDITPPT_IMAGE_BACKEND=api
+export OPENAI_BASE_URL="https://your-openai-compatible-endpoint/v1"
+export OPENAI_API_KEY="..."
+export IMAGE_TO_EDITABLE_PPT_IMAGE_MODEL="your-image-model"
+```
+
+其中 API 地址、模型名和密钥由调用者自己的 provider 配置提供；不要把密钥写入 prompt、仓库或运行日志。只有在明确允许使用当前设备 Codex OAuth Images 时，才设置 `EDITPPT_IMAGE_BACKEND=codex-oauth`。`auto` 适合交互式开发，不是可移植 headless 运行的可靠默认值。
+
 ## Headless CLI
 
 ```bash
@@ -34,7 +47,7 @@ codex exec -C "$PWD/conversion" --approve-for-me \
 
 `--approve-for-me` 仍遵守 Codex 运行时安全策略；不要把 API key 写进命令或仓库。
 
-最终结果通常位于 `<workdir>/run/final/origin_edited.pptx`。只有同时具备最终 PPTX、结构验证和真实渲染记录，才算完成。
+最终结果通常位于 `<workdir>/run/final/origin_edited.pptx`。只有同时具备最终 PPTX、结构验证和真实渲染记录，才算完成；存在一个 PPTX 文件或程序 preview 不能替代真实渲染证据。复杂图像后端失败时，运行可能只完成可安全近似的简单 pictogram，其余对象和差异必须在结果中明确记录。
 
 ## 本地 CLI
 
