@@ -21,6 +21,8 @@
 
 多页 deck 共用一套画布，按各页 `content_box` 等比放入。benchmark 图片比例各异，正式对比应一图一个 run，避免合并画布影响结果。
 
+端到端验收以 headless Codex 为准：当前 `PaperClaw_fig_2` 已有结构与 LibreOffice 实际渲染证据；`PaperClaw_fig_5` 仍是进行中的独立试跑。不要把父会话手工草稿、仅有 `page.pptx`、程序 preview 或准备阶段日志记为完成。
+
 ## 开发与验证
 
 先检查已有兼容 Python 环境；没有时使用 `uv sync --locked` 建立项目 `.venv`。常规开发命令：
@@ -46,6 +48,8 @@ PYTHONPATH=src /path/to/python -m unittest discover -s .agents/tests -v
 当前重点是科学图的保真重建：文字字号和折行、重复图标一一对应、曲线/箭头与分支完整、原生表格、透明边缘以及真实 PPTX 中的字体和对象布局。沿用现有素材来源合同，不把开源参考中的整组截图或近似图标替换引入默认流程。
 
 每次案例优化保留输入哈希、代码版本、使用的模型/后端、manifest、PPTX、程序预览、真实渲染及失败原因。对比结构可编辑性、文本准确性、对象覆盖和渲染保真度；像素相似度不能单独代表成功。只修复实际观察到的失败，不能把单个成功案例推广为全案例通过。
+
+当前首个 headless 成功案例的交付物位于 `benchmark/runs/headless-20260915/fig2/`：最终 PPTX、`conversion/final/validation.json`、页面 manifest、LibreOffice 渲染和 `events-resumed.jsonl`。这是可复现证据样例，不是发布包内容。
 
 端到端案例必须由独立的 headless Codex 进程加载产品 skill，仅接收原始 PNG 和输出要求完成。父会话手写 manifest 或提供对象答案只能算调试，不能替代端到端证据。任务目录的 `.agents/skills/` 可通过符号链接挂载 `src/` 下的产品 skill；它不是第二份产品源码，也不进入发布物。保留 `codex exec --json` 日志和最终回复，若中途人工修复或续跑，明确记录边界。
 

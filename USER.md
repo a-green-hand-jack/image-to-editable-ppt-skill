@@ -76,6 +76,10 @@ editppt run status /absolute/path/to/run
 
 结构验证通过后由 agent 执行 `run record`，所有页记录完成后执行 `run finalize`。交付需说明最终 PPTX 路径、真实渲染检查结果、哪些内容可编辑、哪些仍是独立图片/公式素材，以及未解决的差异。
 
+### 已验证案例
+
+`PaperClaw_fig_2` 已完成一次真实 headless Codex 转换：10 个可编辑文本框、25 个原生形状、无整页位图；LibreOffice 24.2.7.2 生成 PDF/PNG 并完成源图对照。字体替换、抗锯齿和虚线节奏差异已记录。结果曾通过 `.agents/scripts/ppt-to-mac --open` 传到 MacBook 的 `converted-pptx/`。这不代表 18 张 benchmark 全部通过。
+
 ## 恢复
 
 - 首先运行 `editppt run next <run>` 或 `run status` 读取当前状态，保留失败日志和现有素材。
@@ -83,5 +87,6 @@ editppt run status /absolute/path/to/run
 - worker 仍在运行时等待；只有确实丢失或终止后才按 CLI 帮助执行 `run reset --agent-id <id> --confirm-lost`。
 - 安装路径错误：从仓库根重新安装，不再使用旧 `cli/` 子目录。
 - 缺少真实渲染器时保留 PPTX 和程序预览，明确标记真实渲染未验证，不能声称视觉验收完成。
+- Linux 上 LibreOffice 可能因沙箱配置目录只读而退出 1；先使用任务目录内的新 profile，并通过 `codex exec --approve-for-me` 让运行时审批该单次渲染命令。若仍失败，保留 `attempt.txt` 并标记渲染未验证，不要反复改写全局 `HOME` 或关闭所有保护。
 
 卸载 CLI 使用 `uv tool uninstall image-to-editable-ppt-cli`（或 pipx）。skill 注册按安装渠道撤销，不删除原始输入或运行记录。
