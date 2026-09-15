@@ -6,7 +6,7 @@ Usage principles:
 
 - If a deterministic action can be completed with `editppt`, call the CLI directly instead of rewriting it as a temporary Python script.
 - When full CLI parameters are needed, read `editppt <command> --help` or `editppt image <command> --help` first.
-- In network-restricted agents, `editppt prepare`/`editppt run hints` with a PaddleOCR token and CLI fallback `editppt image generate/edit` calls need network approval. The approval and user-interaction policy lives in `SKILL.md` Entry Contract and Phase 1.
+- In network-restricted agents, configured OCR and CLI image calls may require network approval. Follow `SKILL.md` execution boundaries and prepare instructions.
 
 ## Command Tree
 
@@ -72,20 +72,20 @@ The `editppt` CLI is a required runtime surface for this skill. First confirm th
 editppt --help
 ```
 
-If the shell returns command not found, or if the skill was just updated, install the skill-local CLI in editable mode:
+If the shell returns command not found, or if the skill was just updated, install the CLI from the repository root or the released wheel:
 
 ```bash
-pipx install --force --editable <skill-root>/cli
+uv tool install --force <repo-root-or-wheel>
 ```
 
-If `pipx` itself is unavailable, fall back to one of:
+Alternatively use pipx; for source development use an editable repository install:
 
 ```bash
-uv tool install --force --editable <skill-root>/cli
-python3 -m pip install --user -e <skill-root>/cli
+pipx install --force <repo-root-or-wheel>
+uv tool install --force --editable <repo-root>
 ```
 
-`<skill-root>` is the `image-to-editable-ppt` directory that contains `SKILL.md`. On Windows, use the same directory's `cli` subdirectory path.
+`<skill-root>` is the `image-to-editable-ppt` directory containing `SKILL.md`, shipped under `src/editppt/skills/` in a source checkout or `editppt/skills/` in a wheel. It is not the package build root; the root `pyproject.toml` builds both CLI and skill resources.
 
 After the CLI is available, run local runtime checks:
 
@@ -97,13 +97,13 @@ editppt config --api-key "<key>" --base-url "<openai-compatible-base-url>" --mod
 
 Write `editppt config` only when API fallback is needed or when the user explicitly provides a third-party image API. Do not write API keys into the project directory, run directory, prompts, or manifests.
 
-Optional but recommended on first use: configure a PaddleOCR-VL token. The offline detector only measures text geometry (where and how large); with a token the hints also carry recognized text content and cleaner block boundaries. Store it next to the other credentials:
+PaddleOCR is optional. The offline detector measures text geometry (where and how large); a configured OCR service can add recognized text content. Configure it only when requested, using the user's local credential workflow:
 
 ```bash
 editppt config --paddle-ocr-token "<token>"
 ```
 
-`editppt doctor` reports the current text-hints backend; without a token everything still works through the built-in offline detector. When and how to ask the user about the token — including the application URL and the regenerate step — is defined in `SKILL.md` Phase 1.
+`editppt doctor` reports the current text-hints backend. Without a token, continue with offline geometry hints and visual transcription. Do not require signup or ask the user to paste a token into chat.
 
 ## Run Commands
 
@@ -113,9 +113,9 @@ editppt prepare input.pdf
 editppt prepare input.png --image-backend builtin-imagegen
 ```
 
-Purpose: normalize a single image, multiple images, a PDF, or an image-based PPTX into a run directory and generate `deck_manifest.json`, `page_jobs.json`, `notes_manifest.json`, plus per-page `pages/page_NNN/source.png`, `page_request.json`, and text hints. `--image-backend` records the requested run/page contract; selection policy lives in `SKILL.md` subsection "Image Backend Selection".
+Purpose: normalize a single image, multiple images, a PDF, or an image-based PPTX into a run directory and generate `deck_manifest.json`, `page_jobs.json`, `notes_manifest.json`, plus per-page `pages/page_NNN/source.png`, `page_request.json`, and text hints. `--image-backend` records the requested run/page contract; selection policy lives in `SKILL.md` section "1. Prepare".
 
-When a PaddleOCR token is configured, `prepare` may submit the input pages to PaddleOCR for content-aware text hints. In a sandboxed or approval-gated environment, request network approval up front for this command instead of accepting a DNS/sandbox failure followed by lower-quality `builtin-ink` fallback; see `SKILL.md` Phase 1 for the approval-rejection policy.
+When a PaddleOCR token is configured, `prepare` may submit input pages to that service. Respect local-only input constraints and runtime network permissions; use `--no-text-hints` to skip this step when necessary. Report service failures and the actual fallback backend rather than treating offline geometry as recognized text.
 
 ```bash
 editppt run next <run> --json
@@ -145,13 +145,13 @@ Purpose: record that a page has been dispatched to a worker or claimed for singl
 editppt run record <run> --page page_001 --agent-id <worker-id>
 ```
 
-Purpose: validate the required page outputs and record their hashes; failure recovery is defined in `SKILL.md` Phase 3.
+Purpose: validate the required page outputs and record their hashes; failure recovery is defined in `SKILL.md` section "4. Recover and finalize".
 
 ```bash
 editppt run reset <run> --page page_001 --agent-id <worker-id> --confirm-lost
 ```
 
-Purpose: return a page to `pending` and clear dispatch/result records. Dispatched pages require matching `--agent-id` and `--confirm-lost`; eligibility is defined in `SKILL.md` Phase 3.
+Purpose: return a page to `pending` and clear dispatch/result records. Dispatched pages require matching `--agent-id` and `--confirm-lost`; eligibility is defined in `SKILL.md` section "4. Recover and finalize".
 
 ```bash
 editppt run finalize <run>
@@ -189,7 +189,7 @@ editppt run hints <run>
 
 Purpose: regenerate `text_hints.json`/`text_hints.png` for every page of a prepared run — for example right after configuring a PaddleOCR token, so the current run gets content-aware hints without re-running prepare.
 
-When used with a configured PaddleOCR token, this command calls the external OCR service. If the runtime requires approval for network access, request it with the task-local conversion-data justification from `SKILL.md`; see `SKILL.md` Phase 1 for the approval-rejection policy.
+When used with a configured PaddleOCR token, this command calls the external OCR service. Respect runtime approval and user data-processing constraints as described in `SKILL.md`.
 
 ```bash
 editppt page hints pages/page_001

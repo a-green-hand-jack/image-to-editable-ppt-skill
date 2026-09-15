@@ -1,154 +1,34 @@
-# Image to Editable PPT Skill
+# Image to Editable PPT
 
-Rebuild slide images, scanned or image-based PPT/PPTX files, and PDF decks into **object-level editable** PowerPoint (`.pptx`), preserving speaker notes when supplied.
+把科研论文插图、流程图、幻灯片截图、扫描 PDF 和图片型 PPT/PPTX 重建为**对象级可编辑的 PowerPoint**，尽量保持原图的文字、布局、层级和视觉身份。输入有演讲备注时保留备注。
 
-> Use for making visual slides editable or reconstructing slides from screenshots — **not** for authoring new presentations from scratch.
+这是一套由视觉 coding agent 使用的 skill，以及配套的 `editppt` 确定性 CLI。Agent 负责理解图片和编写对象清单；CLI 负责输入规范化、素材处理、PPTX 构建、验证和断点恢复。单独运行 `editppt prepare` 不会自动完成图片理解或重建。
 
----
+## 完整目标形态
 
-## Quick Install
+- 文字、标题、数字、标签成为可编辑文本框；面板、线条、箭头、曲线、表格成为原生 PowerPoint 对象。
+- 复杂图标、照片、插画经过保真分离，作为独立可选择、移动和替换的图片对象。独立图片不等于其内部笔画可编辑；公式目前保留 LaTeX 源及渲染素材，不声称原生公式可编辑。
+- 保持源图比例、位置、字体层级、色彩、连线方向、图标实例数及层叠顺序；不以整页图片加文字覆盖充当重建。
+- `manifest.json` 是逐页及最终 PPTX 的唯一构建依据。素材、坐标、来源和校验信息随运行保留，失败可以定位和恢复。
+- 同时验证对象结构与真实 PPTX 渲染。程序预览、结构校验和视觉通过是不同的证据，不能相互替代。
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/a-green-hand-jack/image-to-editable-ppt-skill/main/install.sh | bash
+已有运行时支持输入准备、逐页任务、文字尺寸提示、图像素材分离处理、原生形状/渐变/路径/表格、公式素材、构建和结构检查。视觉质量仍需在真实案例上逐页验证；当前没有对下述 18 个案例的整体通过率声明。
+
+## 入口
+
+- [USER.md](USER.md)：安装、使用、观察、故障恢复。
+- [DEV.md](DEV.md)：架构、开发目标、验证和发布。
+- [AGENTS.md](AGENTS.md)：coding agent 的边界和约束。
+- [产品 skill](src/editppt/skills/image-to-editable-ppt/SKILL.md)：重建工作流。
+- [benchmark/](benchmark/)：18 张固定 PNG 测试输入；见 [案例说明](benchmark/README.md)。
+
+```text
+src/editppt/                    产品唯一来源：CLI、runtime、可分发 skill
+README.md / DEV.md / USER.md     分别面向了解产品、开发、使用
+AGENTS.md                       coding agent 开发约束
+.agents/                        开发资料、工具、工作流与测试；不进入发布物
+benchmark/                      用户提供的固定评测图片；不进入发布物
+pyproject.toml / uv.lock         构建元数据、依赖与精确锁定
 ```
 
-This single command will:
-
-1. **Clone** the skill repo to `~/.image-to-editable-ppt-skill` (override with `IMAGE_TO_EDITABLE_PPT_DIR`).
-2. **Install** the `editppt` CLI via `uv` (preferred) or `pipx`.
-3. **Verify** the installation with `editppt doctor`.
-
-### Prerequisites
-
-| Tool | Why | Install |
-|------|-----|---------|
-| **git** | Clone the repo | [git-scm.com](https://git-scm.com) |
-| **Python ≥ 3.10** | Runtime for `editppt` CLI | [python.org](https://www.python.org/downloads/) |
-| **uv** or **pipx** | CLI package manager | `curl -fsSL https://astral.sh/uv/install.sh \| sh` or `pip install pipx && pipx ensurepath` |
-
-### Custom Install Location
-
-```bash
-IMAGE_TO_EDITABLE_PPT_DIR=~/my-path curl -fsSL https://raw.githubusercontent.com/a-green-hand-jack/image-to-editable-ppt-skill/main/install.sh | bash
-```
-
-### Uninstall
-
-```bash
-rm -rf ~/.image-to-editable-ppt-skill
-uv tool uninstall image-to-editable-ppt-cli   # or: pipx uninstall image-to-editable-ppt-cli
-```
-
----
-
-## Usage
-
-### Agent / Skills Registry (OpenAI Codex)
-
-For Codex or compatible agent runtimes that support the `npx skills` registry:
-
-```bash
-npx -y skills@latest add a-green-hand-jack/image-to-editable-ppt-skill \
-  --skill image-to-editable-ppt \
-  --agent <agent-id> \
-  --global
-```
-
-Then install the CLI from the skill directory:
-
-```bash
-uv tool install --force ~/.image-to-editable-ppt-skill/cli
-# or: pipx install --force --editable ~/.image-to-editable-ppt-skill/cli
-editppt doctor
-```
-
-### CLI Quick Start
-
-```bash
-# 1. Prepare a run from input images / PDF / PPTX
-editppt prepare slides.pdf
-
-# 2. Rebuild pages (single-page: local; multi-page: dispatched workers)
-editppt run next <run-dir>
-
-# 3. Record validated page results
-editppt run record <run-dir> --page page_001 --agent-id <id>
-
-# 4. Finalize into a single .pptx
-editppt run finalize <run-dir>
-```
-
-Full command reference: [`references/cli-helper.md`](references/cli-helper.md)
-
----
-
-## How It Works
-
-The skill decomposes each slide image into a structured manifest of positioned objects (text boxes, shapes, images, tables, formulas), then rebuilds an editable `.pptx` from that manifest.
-
-```
-Input (image/PDF/PPTX)
-  │
-  ├─ editppt prepare ──▶ run dir + text hints
-  │
-  ├─ Page workers ──────▶ manifest.json + page.pptx per page
-  │
-  ├─ editppt run record ──▶ validation + state tracking
-  │
-  └─ editppt run finalize ─▶ final editable .pptx
-```
-
-Key concepts:
-
-- **Manifest-driven**: `manifest.json` is the single source of truth for every page's object layout.
-- **Deterministic validation**: `editppt run record` validates structure before accepting any page.
-- **Resumable runs**: every state transition goes through CLI commands — never hand-write state JSON.
-- **Image backends**: built-in agent `image_gen.imagegen` tool first, then Codex OAuth, then user-configured OpenAI-compatible API.
-
----
-
-## Repository Structure
-
-```
-├── SKILL.md                  # Skill definition & workflow contract
-├── install.sh                # One-command installer
-├── cli/                      # editppt CLI (Python)
-│   ├── pyproject.toml
-│   └── editppt/
-│       ├── cli.py            # Entry point
-│       └── runtime/          # All CLI subcommands
-├── prompts/
-│   └── page-worker.md        # Template for page-worker prompts
-├── references/
-│   ├── cli-helper.md         # Command reference & examples
-│   ├── manifest-schema.md    # JSON field contracts
-│   └── page-decision-tree.md # Object decision rules
-├── scripts/
-│   └── build-page-worker-prompt.py
-└── agents/
-    └── openai.yaml           # Codex agent interface
-```
-
----
-
-## Updating
-
-Re-run the installer — it will pull the latest `main` and reinstall the CLI:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/a-green-hand-jack/image-to-editable-ppt-skill/main/install.sh | bash
-```
-
-Or manually:
-
-```bash
-cd ~/.image-to-editable-ppt-skill && git pull
-uv tool install --force ./cli
-editppt doctor
-```
-
----
-
-## License
-
-MIT
+开源实现参考及取舍见 [.agents/references/upstream-skills.md](.agents/references/upstream-skills.md)。代码采用 MIT 许可；benchmark 图片的权利归各自权利人，不因放入本仓库而自动适用代码许可。

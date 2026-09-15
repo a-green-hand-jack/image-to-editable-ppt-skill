@@ -22,7 +22,7 @@ CODEX_PPT_ENV_MAP = {
 
 
 def cli_reinstall_hint():
-    return "`pipx install --force --editable <path-to-image-to-editable-ppt>/cli`"
+    return "`uv tool install --force <repo-root-or-wheel>`"
 
 
 def runtime_home():
@@ -234,9 +234,9 @@ def collect_status(check_api=False):
                 "task-local page images, prompts, masks, and references required by OCR/image backends."
             ),
             "paddle_rejection_guidance": (
-                "If PaddleOCR approval is rejected, ask the user to authorize OCR explicitly; "
-                "explain that OCR corrects text boxes, font sizes, and size groups so reconstructed "
-                "PPT text sizing stays stable."
+                "Respect runtime denials and user data-processing constraints. OCR is optional; "
+                "report the unavailable backend and continue with offline geometry and visual "
+                "transcription when permitted."
             ),
         },
         "next": "no action needed" if ok else (
@@ -274,19 +274,13 @@ def doctor(args):
         "and references."
     )
     print(
-        "paddle approval rejection: ask the user to authorize OCR and explain that it corrects "
-        "text boxes, font sizes, and size groups so reconstructed PPT text sizing stays stable."
+        "OCR is optional: respect runtime denials and user data-processing constraints; "
+        "offline geometry hints require visual transcription."
     )
     if hints["paddle_token"] == "unset":
         print(
-            "text hints: ASK THE USER once — a free PaddleOCR token makes text hints content-aware "
-            "(recognized text + cleaner blocks, noticeably better text fidelity). The free personal "
-            "quota is currently more than enough for this skill, so applying is risk-free with no "
-            "extra cost. They can apply at "
-            "{url} and you run `{cmd}`; or they can choose to continue with the offline detector. "
-            "Wait for their choice before reconstructing pages, then do not ask again.".format(
-                url=hints["apply_url"], cmd=hints["configure_command"]
-            )
+            "text hints: offline geometry only; continue with visual transcription and glyph "
+            "measurement. PaddleOCR is optional and is not required to start reconstruction."
         )
     for module, module_ok in status["dependencies"].items():
         print(f"python import {module}: {'ok' if module_ok else 'missing'}")

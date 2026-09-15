@@ -9,3 +9,8 @@ build/
 *.swo
 .env
 .venv/
+.pytest_cache/
+.ruff_cache/
+benchmark/runs/
+benchmark/results/
+outputs/

@@ -97,7 +97,7 @@ Every non-background `visual_inventory` entry must include `source_box_px` and
 that source and preview were checked after the manifest was built; it is not a
 substitute for the exact ID and representation checks enforced by validation.
 
-`image_backend` is written by `editppt prepare` and may be overwritten by `editppt run backend` when needed. Parent-level backend selection policy lives in `SKILL.md` subsection "Image Backend Selection".
+`image_backend` is written by `editppt prepare` and may be overwritten by `editppt run backend` when needed. Parent-level backend selection policy lives in `SKILL.md` section "1. Prepare".
 
 For `backend_id: "builtin-imagegen"`, these fields are required and have fixed meanings:
 
@@ -110,7 +110,7 @@ For `backend_id: "builtin-imagegen"`, these fields are required and have fixed m
 - `fallback_policy.on`: the only events that permit leaving the built-in tool: it is unavailable/not callable, its call errors, an edit input is unreadable, or it returns no valid local image.
 - `fallback_policy.missing_optional_parameters`: always `false`; absent optional controls never authorize fallback.
 
-Other backend metadata may describe model labels, runtime homes, or handoff text, but it does not change this order. Parent-level tool selection and user-interaction policy live in `SKILL.md` subsection "Image Backend Selection"; page reconstructors execute the copied contract above.
+Other backend metadata may describe model labels, runtime homes, or handoff text, but it does not change this order. Parent-level tool selection and user-interaction policy live in `SKILL.md` section "1. Prepare"; page reconstructors execute the copied contract above.
 
 ## `page_jobs.json`
 

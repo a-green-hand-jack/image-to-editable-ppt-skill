@@ -16,11 +16,17 @@ dependencies = [
 editppt = "editppt.cli:main"
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling==1.32.0"]
 build-backend = "hatchling.build"
 
+[dependency-groups]
+dev = ["hatchling==1.32.0"]
+
 [tool.hatch.build.targets.wheel]
-packages = ["editppt"]
+packages = ["src/editppt"]
+
+[tool.hatch.build.targets.sdist]
+include = ["/src", "/pyproject.toml", "/uv.lock", "/LICENSE"]
 
 [tool.hatch.build]
 exclude = [
