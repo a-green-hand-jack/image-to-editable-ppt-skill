@@ -326,20 +326,41 @@ def preview_color(value):
     return value
 
 
-def shape_fill(fill):
+def gradient_stops_xml(spec):
+    stops = spec.get("stops") if isinstance(spec, dict) else None
+    if not isinstance(stops, list) or len(stops) < 2:
+        raise ValueError("gradient requires at least two stops")
+    rendered = []
+    for stop in stops:
+        if not isinstance(stop, dict) or "position" not in stop or "color" not in stop:
+            raise ValueError("gradient stops require position and color")
+        position = max(0, min(100000, int(round(float(stop["position"]) * 1000))))
+        rendered.append(f'<a:gs pos="{position}"><a:srgbClr val="{hex_color(stop["color"])}"/></a:gs>')
+    return "".join(rendered)
+
+
+def gradient_xml(spec):
+    angle = float(spec.get("angle", 0)) if isinstance(spec, dict) else 0
+    angle_units = int(round(angle * 60000))
+    return f'<a:gradFill rotWithShape="1"><a:gsLst>{gradient_stops_xml(spec)}</a:gsLst><a:lin ang="{angle_units}" scaled="1"/></a:gradFill>'
+
+
+def shape_fill(fill, gradient=None):
+    if gradient:
+        return gradient_xml(gradient)
     if not fill or fill == "none":
         return '<a:noFill/>'
     return f'<a:solidFill><a:srgbClr val="{hex_color(fill)}"/></a:solidFill>'
 
 
-def shape_line_xml(stroke, width, dash=None, start_arrow=None, end_arrow=None):
-    if not stroke or stroke == "none":
+def shape_line_xml(stroke, width, dash=None, start_arrow=None, end_arrow=None, gradient=None):
+    if (not stroke or stroke == "none") and not gradient:
         return '<a:ln><a:noFill/></a:ln>'
     dash_xml = f'<a:prstDash val="{xml_text(dash)}"/>' if dash else ""
     return (
         f'<a:ln w="{int(float(width or 1) * 12700)}">'
-        f'<a:solidFill><a:srgbClr val="{hex_color(stroke)}"/></a:solidFill>'
-        f"{dash_xml}"
+        + (gradient_xml(gradient) if gradient else f'<a:solidFill><a:srgbClr val="{hex_color(stroke)}"/></a:solidFill>')
+        + f"{dash_xml}"
         + (f'<a:headEnd type="{xml_text(start_arrow)}"/>' if start_arrow else "")
         + (f'<a:tailEnd type="{xml_text(end_arrow)}"/>' if end_arrow else "")
         + "</a:ln>"
@@ -442,8 +463,8 @@ def shape_xml(idx, item):
     stroke_width = item.get("stroke_width", 1)
     flip_h = ' flipH="1"' if item.get("flip_h") else ""
     flip_v = ' flipV="1"' if item.get("flip_v") else ""
-    fill = shape_fill(item.get("fill"))
-    line = shape_line_xml(item.get("stroke", "#000000"), stroke_width, item.get("dash"), item.get("start_arrow"), item.get("end_arrow"))
+    fill = shape_fill(item.get("fill"), item.get("fill_gradient"))
+    line = shape_line_xml(item.get("stroke", "#000000"), stroke_width, item.get("dash"), item.get("start_arrow"), item.get("end_arrow"), item.get("stroke_gradient"))
     preset = item.get("preset")
     if kind == "path":
         geometry = custom_path_geometry_xml(item)
@@ -825,6 +846,43 @@ def render_preview(manifest, manifest_path, out_path):
         fill = preview_color(item.get("fill"))
         outline = preview_color(item.get("stroke", "#000000"))
         width = max(1, int(float(item.get("stroke_width", 1))))
+        gradient = item.get("fill_gradient")
+        stroke_gradient = item.get("stroke_gradient")
+        def gradient_patch(spec, patch_w, patch_h):
+            stops = sorted(spec["stops"], key=lambda stop: float(stop["position"]))
+            colors = [tuple(int(str(stop["color"]).lstrip("#")[i:i + 2], 16) for i in (0, 2, 4)) for stop in stops]
+            vertical = abs(float(spec.get("angle", 0)) % 180 - 90) < 45
+            patch = Image.new("RGB", (patch_w, patch_h))
+            pixels = patch.load()
+            for py in range(patch_h):
+                for px in range(patch_w):
+                    position = (py / max(1, patch_h - 1) if vertical else px / max(1, patch_w - 1)) * 100
+                    last = len(stops) - 1
+                    index = next((i for i in range(last) if position <= float(stops[i + 1]["position"])), last)
+                    if index == last:
+                        color = colors[last]
+                    else:
+                        left = float(stops[index]["position"]); right = float(stops[index + 1]["position"])
+                        ratio = max(0, min(1, (position - left) / max(1e-9, right - left)))
+                        color = tuple(round(colors[index][k] + (colors[index + 1][k] - colors[index][k]) * ratio) for k in range(3))
+                    pixels[px, py] = color
+            return patch
+
+        if isinstance(gradient, dict) and isinstance(gradient.get("stops"), list) and len(gradient["stops"]) >= 2 and item.get("type") in {"rect", "roundRect", "ellipse"}:
+            patch_w = max(1, int(box[2] - box[0]))
+            patch_h = max(1, int(box[3] - box[1]))
+            patch = gradient_patch(gradient, patch_w, patch_h)
+            mask = Image.new("L", (patch_w, patch_h), 0)
+            mask_draw = ImageDraw.Draw(mask)
+            local_box = (0, 0, patch_w - 1, patch_h - 1)
+            if item.get("type") == "ellipse":
+                mask_draw.ellipse(local_box, fill=255)
+            elif item.get("type") == "roundRect" or item.get("preset") == "roundRect":
+                mask_draw.rounded_rectangle(local_box, radius=max(1, int(float(item.get("radius", 0.12)) * scale)), fill=255)
+            else:
+                mask_draw.rectangle(local_box, fill=255)
+            canvas.paste(patch, (int(box[0]), int(box[1])), mask)
+            fill = None
         if item.get("polygon"):
             points = [(point[0] * scale, point[1] * scale) for point in item["polygon"]]
             draw.polygon(points, fill=None if fill in (None, "none") else fill, outline=None if outline == "none" else outline)
@@ -852,6 +910,18 @@ def render_preview(manifest, manifest_path, out_path):
             draw.polygon(points, fill=None if fill in (None, "none") else fill, outline=None if outline == "none" else outline)
         else:
             draw.rectangle(box, fill=None if fill in (None, "none") else fill, outline=None if outline == "none" else outline, width=width)
+        if isinstance(stroke_gradient, dict) and isinstance(stroke_gradient.get("stops"), list) and len(stroke_gradient["stops"]) >= 2 and item.get("type") in {"rect", "roundRect", "ellipse"}:
+            patch_w = max(1, int(box[2] - box[0])); patch_h = max(1, int(box[3] - box[1]))
+            mask = Image.new("L", (patch_w, patch_h), 0)
+            mask_draw = ImageDraw.Draw(mask)
+            local_box = (0, 0, patch_w - 1, patch_h - 1)
+            if item.get("type") == "ellipse":
+                mask_draw.ellipse(local_box, outline=255, width=width)
+            elif item.get("type") == "roundRect" or item.get("preset") == "roundRect":
+                mask_draw.rounded_rectangle(local_box, radius=max(1, int(float(item.get("radius", 0.12)) * scale)), outline=255, width=width)
+            else:
+                mask_draw.rectangle(local_box, outline=255, width=width)
+            canvas.paste(gradient_patch(stroke_gradient, patch_w, patch_h), (int(box[0]), int(box[1])), mask)
 
     def render_image(item):
         src = Path(item["path"])

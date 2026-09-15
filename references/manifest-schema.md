@@ -270,6 +270,13 @@ Positioned build object requirements:
 
 Missing coordinates are page-contract violations. The runtime must reject them during `editppt run record` and deck validation because otherwise missing values fall back to default positions such as the top-left corner.
 
+Native shape gradients are supported with optional `fill_gradient` and
+`stroke_gradient` objects. Each has `stops`, an ordered list of at least two
+`{"position": 0-100, "color": "#RRGGBB"}` entries, and an optional `angle`
+in degrees. These fields produce native DrawingML linear gradients and remain
+editable in PowerPoint; use them for source gradients instead of flattening a
+gradient into a raster or silently replacing it with one solid color.
+
 **Native tables**
 
 `tables` is optional and defaults to `[]`, preserving existing manifests. Each item builds one native DrawingML `a:tbl` object. Object-source decisions live in `page-decision-tree.md` section 3.3, "Structural Primitives and Layout Objects."

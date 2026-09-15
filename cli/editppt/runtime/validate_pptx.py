@@ -119,6 +119,43 @@ def contains_any(text, terms):
     return any(re.search(r"(?<![a-z0-9])" + re.escape(term) + r"(?![a-z0-9])", text.lower()) for term in terms)
 
 
+def gradient_contract_violations(item, field):
+    violations = []
+    gradient = item.get(field)
+    if gradient is None:
+        return violations
+    if not isinstance(gradient, dict):
+        return [{"field": field, "reason": "gradient must be an object"}]
+    stops = gradient.get("stops")
+    if not isinstance(stops, list) or len(stops) < 2:
+        violations.append({"field": field + ".stops", "reason": "gradient requires at least two stops"})
+        return violations
+    positions = []
+    for index, stop in enumerate(stops):
+        if not isinstance(stop, dict) or "position" not in stop or "color" not in stop:
+            violations.append({"field": f"{field}.stops[{index}]", "reason": "gradient stops require position and color"})
+            continue
+        try:
+            position = float(stop["position"])
+            if not 0 <= position <= 100:
+                raise ValueError
+            positions.append(position)
+            color = str(stop["color"]).lstrip("#")
+            if len(color) != 6 or any(char not in "0123456789abcdefABCDEF" for char in color):
+                raise ValueError
+        except (TypeError, ValueError):
+            violations.append({"field": f"{field}.stops[{index}]", "reason": "gradient stop position must be 0-100 and color must be six-digit hex"})
+    if positions != sorted(positions):
+        violations.append({"field": field + ".stops", "reason": "gradient stop positions must be nondecreasing"})
+    try:
+        angle = float(gradient.get("angle", 0))
+        if not 0 <= angle < 360:
+            raise ValueError
+    except (TypeError, ValueError):
+        violations.append({"field": field + ".angle", "reason": "gradient angle must be in [0, 360) degrees"})
+    return violations
+
+
 def visual_item_path(item):
     for key in ("path", "asset", "asset_path", "image", "image_path", "corresponding_asset"):
         value = item.get(key) if isinstance(item, dict) else None
@@ -397,6 +434,11 @@ def quality_contract_violations(manifest):
             violations.append({"field": "visual_audit.rebuilt_arrows_connectors", "reason": f"audit count does not match {connector_count} line/path objects in the manifest"})
 
     for index, shape in enumerate(manifest.get("shapes", [])):
+        for gradient_field in ("fill_gradient", "stroke_gradient"):
+            violations.extend(
+                {**violation, "field": f"shapes[{index}].{violation['field']}"}
+                for violation in gradient_contract_violations(shape, gradient_field)
+            )
         is_round_rect = shape.get("type") == "roundRect" or shape.get("preset") == "roundRect"
         if is_round_rect and not shape.get("source_corner_radius_px"):
             violations.append(

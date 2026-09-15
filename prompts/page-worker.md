@@ -32,6 +32,7 @@ Recovery: read any previous validation failure before editing. Verify reusable a
 
 Execution:
 1. Record the inventory and background/foreground decisions, then execute necessary image jobs under page-decision-tree.md sections 1-2. Page-local image jobs remain serial. Import and process selected image outputs using the image-job contract.
+   For dense/repeated/overlapping foreground objects, split the inventory into small serial asset sheets and verify each sheet against its exact source-instance IDs before import; reject merged subjects, missing repeated marks, or wrong order.
 2. Reconstruct native elements under the applicable section 3 rules and write manifest.json using its field contract.
 3. Run `editppt page build {{PAGE_DIR}}`, then `editppt page contact-sheet {{PAGE_DIR}}`.
 4. Perform the Final Self-Check against the source and run `editppt page validate {{PAGE_DIR}}`. Fix page-local issues yourself; after a change rebuild the affected outputs and verify the changed result. Once the current outputs pass, return without another unchanged build/QA cycle.
