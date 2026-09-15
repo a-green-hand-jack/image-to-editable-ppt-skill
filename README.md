@@ -26,7 +26,7 @@ curl -fsSL https://raw.githubusercontent.com/a-green-hand-jack/image-to-editable
 
 从 PNG 到可编辑 PPTX 的产品流程如下：
 
-可渲染的 Mermaid 源文件见 [docs/skill-flow.mmd](docs/skill-flow.mmd)。核心原则是让 foundation model 负责视觉理解与重建判断，让 `editppt` 负责确定性的输入准备、素材处理、PPTX 构建、验证和最终组装。
+可渲染的 Mermaid 源文件见 [skill-flow.mmd](skill-flow.mmd)。核心原则是让 foundation model 负责视觉理解与重建判断，让 `editppt` 负责确定性的输入准备、素材处理、PPTX 构建、验证和最终组装。
 
 ```mermaid
 flowchart LR
