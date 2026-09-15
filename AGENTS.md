@@ -2,6 +2,8 @@
 
 先读 README.md 理解完整产品目标，再读 DEV.md；安装和操作以 USER.md 为准。
 
+优先利用 foundation model 的视觉理解与重建能力，保持自身编排轻量。优化以实际转换效果为依据；不要为了调度或状态管理扩张框架。传输 PPTX 到 MacBook 统一使用 `.agents/scripts/ppt-to-mac`，不要临时编写传输胶水。
+
 - 产品完整且唯一来源是 `src/editppt/`，产品 skill 位于 `src/editppt/skills/image-to-editable-ppt/`。不得在根目录或 `.agents/` 维护第二份产品实现。
 - `.agents/` 是开发平面，绝不进入 wheel/sdist 或运行依赖。开发测试在 `.agents/tests/`；开源参考及采纳边界在 `.agents/references/`。
 - `benchmark/*.png` 是固定评测输入。保留原名和原始字节，新增或替换案例需明确来源并更新哈希；不得覆写为重建输出。

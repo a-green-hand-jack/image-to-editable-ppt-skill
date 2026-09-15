@@ -13,12 +13,15 @@ editppt doctor
 
 开发时可用 `uv tool install --force --editable .`。也可直接安装发行的 wheel。`doctor` 检查依赖和配置是否存在，不会证明远端 API 可用或重建质量达标。
 
-将 `src/editppt/skills/image-to-editable-ppt/` 注册为 agent 的 skill 目录。例如在个人 Codex 使用且目标不存在时：
+将 `src/editppt/skills/image-to-editable-ppt/` 注册为 agent 的 skill 目录。推荐在任务目录挂载，只创建指向产品源码的链接，不复制第二份实现：
 
 ```bash
-mkdir -p "${CODEX_HOME:-$HOME/.codex}/skills"
-ln -s "$PWD/src/editppt/skills/image-to-editable-ppt" \
-  "${CODEX_HOME:-$HOME/.codex}/skills/image-to-editable-ppt"
+repo_dir="$PWD"
+task_dir="$PWD/outputs/example"
+mkdir -p "$task_dir/.agents/skills"
+# 仅在目标不存在时执行；不覆盖已有 skill。
+ln -s "$repo_dir/src/editppt/skills/image-to-editable-ppt" \
+  "$task_dir/.agents/skills/image-to-editable-ppt"
 ```
 
 受统一 profile 管理的机器按其 skill 发布流程注册，不覆盖已有安装。wheel 安装的 skill 也包含完整资源；在同一 Python 环境执行下式可以找到它：
@@ -30,6 +33,26 @@ python -c 'from importlib.resources import files; print(files("editppt") / "skil
 重启或刷新 agent 的 skill 发现，再请求：
 
 > 使用 image-to-editable-ppt，把这张图重建成可编辑 PPTX，保留所有标签、箭头、图标和版式，并检查真实 PPTX 渲染。
+
+## Headless Codex：PNG → PPTX
+
+目标入口是加载此 skill 的 `codex exec`：模型自己看图、编写 manifest、调用 CLI、检查真实渲染并修正，调用者不需要手工标注对象或执行逐步转换。上面的任务目录挂载完成后，从同一 shell 执行：
+
+```bash
+codex exec -C "$task_dir" --approve-for-me \
+  --image "$repo_dir/benchmark/PaperClaw_fig_2.png" \
+  --json -o "$task_dir/result.md" \
+  "Use \$image-to-editable-ppt to reconstruct the attached PNG as editable PowerPoint. Input: $repo_dir/benchmark/PaperClaw_fig_2.png. Put the run in ./conversion. Complete reconstruction, real PPTX render inspection, validation, record and finalize. Report the final PPTX path and remaining differences. Do not modify product source or global configuration." \
+  > "$task_dir/events.jsonl" 2> "$task_dir/stderr.log"
+```
+
+使用受管 provider 的机器将 `codex exec` 换为现有的 `ai codex exec`，沿用已选账户；不要复制凭据或新增模型调度器。运行前安装 `editppt`，确保视觉模型可用；真实渲染还需要 LibreOffice (`soffice`) 和 Poppler (`pdftoppm`)，或可用的 PowerPoint 渲染通道。纯文字/流程图不需要图像生成后端，复杂插画分离仍需配置相应工具。
+
+示例使用 Codex CLI 0.154 的 `--approve-for-me`：工作区内写入仍受沙箱限制，必要的外部命令交给运行时自动审批。它不是无条件放行。若渲染器已能在沙箱内工作，也可使用 `--sandbox workspace-write`；但无审批的非交互运行可能无法完成 Linux LibreOffice 渲染。不要用关闭全部保护来掩盖失败，受管环境的权限策略始终优先。
+
+默认最终文件为 `<task_dir>/conversion/final/origin_edited.pptx`。进程退出码、`result.md` 和最终验证文件一起判断是否完成；退出成功或存在 PPTX 不代表视觉验收通过。中间稿及失败记录保留在任务目录。非交互进程遇到权限或工具缺失会报告阻塞，不能自动绕过。
+
+Codex 的 `.agents/skills` 发现与符号链接支持见 [官方 skill 文档](https://learn.chatgpt.com/docs/build-skills#where-codex-loads-local-skills)，非交互入口见 [官方 codex exec 文档](https://developers.openai.com/codex/noninteractive/)。
 
 ## 运行和观察
 

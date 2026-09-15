@@ -1,0 +1,128 @@
+#!/usr/bin/env python3
+"""Transfer PPTX files to a Mac over SSH/SFTP and verify their SHA-256."""
+
+import argparse
+import hashlib
+import os
+from pathlib import Path, PurePosixPath
+import re
+import shlex
+import subprocess
+import sys
+import uuid
+import zipfile
+
+
+DEFAULT_DEST = "Pictures/poster/参考测试/I2P/converted-pptx"
+SSH_OPTIONS = ["-o", "BatchMode=yes", "-o", "ConnectTimeout=12"]
+
+
+def clean_path(value):
+    if any(ord(char) < 32 for char in value):
+        raise ValueError("Paths must not contain control characters")
+    return value
+
+
+def sftp_quote(value):
+    return '"' + clean_path(str(value)).replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def remote(host, command):
+    result = subprocess.run(
+        ["ssh", *SSH_OPTIONS, host, "sh -c " + shlex.quote(command)],
+        text=True, capture_output=True, timeout=120,
+    )
+    if result.returncode:
+        raise RuntimeError(result.stderr.strip() or result.stdout.strip() or "SSH failed")
+    return result.stdout.strip()
+
+
+def digest(path):
+    value = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            value.update(chunk)
+    return value.hexdigest()
+
+
+def transfer(host, source, dest, overwrite=False):
+    target = str(PurePosixPath(dest) / source.name)
+    qtarget = shlex.quote(target)
+    expected = digest(source)
+    present = remote(host, f"if test -e {qtarget}; then shasum -a 256 {qtarget}; fi")
+    if present:
+        if present.split()[0] == expected:
+            print(f"unchanged (SHA-256 verified): {target}")
+            return target
+        if not overwrite:
+            raise RuntimeError(f"Destination exists with different content: {target}; use --overwrite explicitly")
+    staging = str(PurePosixPath(dest) / (".ppt-transfer-" + uuid.uuid4().hex + ".pptx"))
+    qstage = shlex.quote(staging)
+    try:
+        subprocess.run(
+            ["sftp", *SSH_OPTIONS, "-b", "-", host],
+            input=f"put {sftp_quote(source)} {sftp_quote(staging)}\n",
+            text=True, check=True, timeout=300,
+        )
+        actual = remote(host, f"shasum -a 256 {qstage}").split()[0]
+        if actual != expected:
+            raise RuntimeError(f"SHA-256 mismatch for {source.name}; target not published")
+        if overwrite:
+            remote(host, f"mv -f {qstage} {qtarget}")
+        else:
+            # A hard link publishes atomically and refuses an existing target.
+            remote(host, f"ln {qstage} {qtarget} && rm {qstage}")
+        print(f"transferred (SHA-256 verified): {target}")
+        return target
+    finally:
+        remote(host, f"rm -f {qstage}")
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("files", nargs="+", type=Path, help="One or more local .pptx files")
+    parser.add_argument("--host", default=os.getenv("EDITPPT_MAC_HOST", "macbook"), help="SSH alias (default: macbook)")
+    parser.add_argument("--dest", default=os.getenv("EDITPPT_MAC_DEST", DEFAULT_DEST), help="Absolute Mac path, or path relative to its home")
+    parser.add_argument("--open", action="store_true", help="Open verified files in Microsoft PowerPoint on the Mac")
+    parser.add_argument("--overwrite", action="store_true", help="Replace same-name remote files with different content")
+    parser.add_argument("--dry-run", action="store_true", help="Validate files and show destination without connecting")
+    args = parser.parse_args()
+    if not re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.@-]*", args.host):
+        parser.error("--host must be an SSH alias or user@hostname")
+    sources = [path.expanduser().resolve(strict=True) for path in args.files]
+    if len({p.name for p in sources}) != len(sources):
+        parser.error("Input basenames must be unique")
+    for source in sources:
+        clean_path(str(source))
+        if source.suffix.lower() != ".pptx":
+            parser.error(f"Not a .pptx file: {source}")
+        with zipfile.ZipFile(source) as archive:
+            if "ppt/presentation.xml" not in archive.namelist() or archive.testzip():
+                parser.error(f"Invalid PPTX package: {source}")
+    dest = clean_path(args.dest)
+    if not dest.strip():
+        parser.error("--dest must not be empty")
+    if args.dry_run:
+        for source in sources:
+            print(f"{source} -> {args.host}:{dest}/{source.name}")
+        return 0
+    if dest.startswith("~/"):
+        dest = dest[2:]
+    if not dest.startswith("/"):
+        home = remote(args.host, 'printf "%s" "$HOME"')
+        dest = str(PurePosixPath(home) / dest)
+    remote(args.host, "mkdir -p " + shlex.quote(dest))
+    for source in sources:
+        target = transfer(args.host, source, dest, args.overwrite)
+        if args.open:
+            remote(args.host, "open -a 'Microsoft PowerPoint' " + shlex.quote(target))
+            print(f"opened in Microsoft PowerPoint: {target}")
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        raise SystemExit(main())
+    except (OSError, ValueError, RuntimeError, zipfile.BadZipFile, subprocess.SubprocessError) as exc:
+        print(f"ppt-to-mac: {exc}", file=sys.stderr)
+        raise SystemExit(1)

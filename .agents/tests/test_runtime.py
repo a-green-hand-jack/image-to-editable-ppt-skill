@@ -74,7 +74,8 @@ class RuntimeTests(unittest.TestCase):
         manifest = {
             "source": {"path": "source.png", "width_px": 480, "height_px": 240},
             "slide": request["slide"], "content_box": request["content_box"],
-            "text_boxes": [{"id": "label", "text": "Editable label", "box_px": [30, 30, 220, 40],
+            "required_text": ["Editable\nlabel"],
+            "text_boxes": [{"id": "label", "text": "Editable\nlabel", "box_px": [30, 30, 220, 70],
                             "font_size": 18, "font": "Arial", "fit_text": False}],
             "shapes": [{"id": "arrow", "type": "line", "points_px": [40, 130, 400, 130],
                         "stroke": "000000", "end_arrow": "triangle"}],
@@ -85,14 +86,17 @@ class RuntimeTests(unittest.TestCase):
         with zipfile.ZipFile(page / "page.pptx") as archive:
             self.assertIsNone(archive.testzip())
             slide = ET.fromstring(archive.read("ppt/slides/slide1.xml"))
-            self.assertIn("Editable label", [item.text for item in slide.findall(".//a:t", ns)])
+            self.assertEqual([item.text for item in slide.findall(".//a:t", ns)], ["Editable", "label"])
             self.assertTrue(slide.findall(".//a:tailEnd[@type='triangle']", ns))
         self.assertTrue((page / "preview.png").is_file())
         self.command("page", "contact-sheet", page)
         self.assertTrue((page / "split_assets_contact.png").is_file())
         # A buildable PPTX without source-grounded inventory/audit is not accepted.
         self.command("page", "validate", page, "--report", "validation.json", success=False)
-        self.assertIs(json.loads((page / "validation.json").read_text())["passed"], False)
+        validation = json.loads((page / "validation.json").read_text())
+        self.assertIs(validation["passed"], False)
+        self.assertEqual(validation["missing_required_text"], [])
+        self.assertIn("Editable\nlabel", validation["all_text"])
 
 
 if __name__ == "__main__":

@@ -10,6 +10,8 @@
 
 ## 架构
 
+核心能力来自 foundation model 对图片、语义、布局和视觉差异的理解。优先改进模型输入、任务说明与视觉反馈；自己的编排只承担必要的文件处理、确定性构建和状态记录，不作为主要优化目标，不增加第二套 agent 调度系统。
+
 1. `cli.py` 启动 `runtime/main.py` 的公开 `editppt` 命令。
 2. `prepare` 规范化图片/PDF/PPT(X)，写入页图、画布、任务和备注。文字提示可选，离线提示仅测量几何。
 3. 视觉 agent 根据产品 skill 识别对象，使用逐页提示进行重建；CLI 不内置第二套模型调度器。
@@ -45,7 +47,11 @@ PYTHONPATH=src /path/to/python -m unittest discover -s .agents/tests -v
 
 每次案例优化保留输入哈希、代码版本、使用的模型/后端、manifest、PPTX、程序预览、真实渲染及失败原因。对比结构可编辑性、文本准确性、对象覆盖和渲染保真度；像素相似度不能单独代表成功。只修复实际观察到的失败，不能把单个成功案例推广为全案例通过。
 
+端到端案例必须由独立的 headless Codex 进程加载产品 skill，仅接收原始 PNG 和输出要求完成。父会话手写 manifest 或提供对象答案只能算调试，不能替代端到端证据。任务目录的 `.agents/skills/` 可通过符号链接挂载 `src/` 下的产品 skill；它不是第二份产品源码，也不进入发布物。保留 `codex exec --json` 日志和最终回复，若中途人工修复或续跑，明确记录边界。
+
 ## 安装与发布
+
+开发预览的一键传输命令为 `.agents/scripts/ppt-to-mac <file.pptx> [more.pptx] --open`。它通过 SSH/SFTP 发送到 MacBook 并核对 SHA-256，默认保存在原 I2P 图片目录下的 `converted-pptx/`。支持 `--dest`、`--host`（或 `EDITPPT_MAC_DEST` / `EDITPPT_MAC_HOST`）、`--dry-run`。同名同内容跳过，同名不同内容拒绝覆盖，除非明确传入 `--overwrite`。`--open` 只在传输核验成功后用 Microsoft PowerPoint 打开。脚本属于开发平面，不随产品发布。
 
 从仓库根目录运行 `bash .agents/scripts/install.sh` 可安装 CLI；它使用本地源码，不自动拉取或删除仓库。产品 skill 的安装路径见 USER.md。修改源码后重新安装或使用 editable 安装。
 

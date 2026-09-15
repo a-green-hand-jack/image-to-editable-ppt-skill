@@ -4,6 +4,8 @@
 
 这是一套由视觉 coding agent 使用的 skill，以及配套的 `editppt` 确定性 CLI。Agent 负责理解图片和编写对象清单；CLI 负责输入规范化、素材处理、PPTX 构建、验证和断点恢复。单独运行 `editppt prepare` 不会自动完成图片理解或重建。
 
+主要使用方式是 **headless Codex 加载 skill，输入 PNG，输出 PPTX**。图片理解、对象重建和视觉修正由该进程中的 foundation model 完成，调用者不需要手工编写 manifest。挂载和执行命令见 [USER.md](USER.md#headless-codexpng--pptx)。
+
 ## 完整目标形态
 
 - 文字、标题、数字、标签成为可编辑文本框；面板、线条、箭头、曲线、表格成为原生 PowerPoint 对象。

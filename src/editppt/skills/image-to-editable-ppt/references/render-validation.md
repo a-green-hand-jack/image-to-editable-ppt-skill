@@ -21,6 +21,8 @@ test -s render-001/page.png
 
 Use a fresh numbered render directory after each changed build, so a failed converter cannot leave an old PDF/PNG masquerading as the current result. Check command output as well as file existence: a converter may exit successfully without creating the requested file. Never overwrite `preview.png` with the real render; preserve the two evidence sources separately. If a renderer reports a file lock, use its supported isolated profile or close the owning application only when authorized.
 
+For a profile conflict, use a new profile under the owned run, e.g. `-env:UserInstallation=file://$PWD/render-001/lo-profile`, instead of changing `HOME`, deleting shared profiles, or using fixed global temporary paths. Linux sandboxing can also prevent LibreOffice startup even with a writable profile. On permission errors or repeated exit 1 without a PDF, request the runtime's normal approval for that specific render command when supported; otherwise report the renderer as blocked. Do not keep changing paths or disabling sandbox protections. A headless launcher must configure its approval policy before starting; the skill cannot grant permissions.
+
 Inspect the resulting image and `source.png` at comparable display scale. Respect `content_box` when the source is letterboxed; do not stretch a source image to force pixel agreement. Check:
 
 - Text content, glyph sizes, line breaks, superscripts, clipping, font substitution, and any CJK missing glyphs.

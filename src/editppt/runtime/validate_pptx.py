@@ -628,7 +628,16 @@ def required_texts_from_manifest(manifest):
 
 def collect_text(xml_bytes):
     root = ET.fromstring(xml_bytes)
-    return "".join(node.text or "" for node in root.findall(".//a:t", NS))
+    # Runs within a paragraph are contiguous; paragraphs and explicit breaks
+    # are not. Flattening every a:t erased source line breaks and joined labels.
+    return "\n".join(
+        "".join(
+            "\n" if node.tag == f"{{{NS['a']}}}br" else node.text or ""
+            for node in paragraph.iter()
+            if node.tag in (f"{{{NS['a']}}}t", f"{{{NS['a']}}}br")
+        )
+        for paragraph in root.findall(".//a:p", NS)
+    )
 
 
 def collect_paragraph_text(xml_bytes):
