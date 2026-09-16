@@ -8,7 +8,7 @@ import zipfile
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-from build_pptx_from_manifest import TEXT_ALIGNMENTS, TEXT_VERTICAL_ALIGNMENTS, normalize_manifest, slide_xml
+from build_pptx_from_manifest import TEXT_ALIGNMENTS, TEXT_VERTICAL_ALIGNMENTS, normalize_manifest, slide_xml, source_slide_manifest
 
 
 NS = {
@@ -667,7 +667,9 @@ def validate_deck(args):
     deck_path = Path(args.deck_manifest).resolve()
     deck = read_manifest(deck_path)
     root = Path(deck.get("job_dir", deck_path.parent)).resolve()
-    expected_pages = int(deck.get("page_count", len(deck.get("pages", []))))
+    page_count = int(deck.get("page_count", len(deck.get("pages", []))))
+    include_source = deck.get("include_source_slides", True) is True
+    expected_pages = page_count * (2 if include_source else 1)
     notes_manifest = {}
     notes_path = deck.get("notes_manifest")
     if notes_path:
@@ -681,11 +683,13 @@ def validate_deck(args):
         "pptx": str(Path(args.pptx).resolve()),
         "deck_manifest": str(deck_path),
         "expected_pages": expected_pages,
+        "source_page_count": page_count,
         "slides": 0,
         "page_manifests_missing": [],
         "page_validation_missing": [],
         "failed_page_validations": [],
         "page_contract_violations": [],
+        "source_slide_violations": [],
         "notes_expected": len(notes_manifest.get("notes", [])),
         "notes_found": 0,
         "notes_hash_mismatches": [],
@@ -745,8 +749,28 @@ def validate_deck(args):
         with zipfile.ZipFile(args.pptx) as z:
             names = z.namelist()
             report["slides"] = len([n for n in names if re.match(r"ppt/slides/slide\d+\.xml$", n)])
+            presentation = ET.fromstring(z.read("ppt/presentation.xml"))
+            slide_rels = {rel["id"]: rel["resolved"] for rel in relationship_targets(z, "ppt/_rels/presentation.xml.rels", names)}
+            ordered_parts = [slide_rels.get(item.get("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id"))
+                             for item in presentation.findall("p:sldIdLst/p:sldId", NS)]
+            if ordered_parts != [f"ppt/slides/slide{i}.xml" for i in range(1, expected_pages + 1)]:
+                report["page_contract_violations"].append({"field": "slide_order", "reason": "presentation slide order/count differs from input order"})
             for page_index, page_manifest in geometry_manifests:
-                slide_part = f"ppt/slides/slide{page_index}.xml"
+                slide_number = page_index * 2 if include_source else page_index
+                slide_part = f"ppt/slides/slide{slide_number}.xml"
+                if include_source:
+                    source_path = root / deck["pages"][page_index - 1]["source_image"]
+                    reference_part = f"ppt/slides/slide{slide_number - 1}.xml"
+                    expected_reference = slide_xml(normalize_manifest(source_slide_manifest(page_manifest, source_path)))
+                    reference_rels = relationship_targets(z, f"ppt/slides/_rels/slide{slide_number - 1}.xml.rels", names)
+                    reference_images = [rel for rel in reference_rels if rel["type"].endswith("/image")]
+                    if (reference_part not in names
+                            or ET.canonicalize(z.read(reference_part).decode()) != ET.canonicalize(expected_reference)
+                            or len(reference_images) != 1
+                            or reference_images[0]["external"]
+                            or reference_images[0]["resolved"] not in names
+                            or hashlib.sha256(z.read(reference_images[0]["resolved"])).hexdigest() != file_sha256(source_path)):
+                        report["source_slide_violations"].append({"page_index": page_index, "reason": "reference slide must contain the unchanged source raster in its content box"})
                 if slide_part in names:
                     slide_root = ET.fromstring(z.read(slide_part))
                     violations = (line_geometry_violations(page_manifest, slide_root)
@@ -760,6 +784,8 @@ def validate_deck(args):
             report["notes_found"] = len(notes_texts)
             for entry in notes_manifest.get("notes", []):
                 page_index = int(entry.get("page_index", 0))
+                if include_source:
+                    page_index *= 2
                 expected_hash = entry.get("text_sha256", sha256_text(entry.get("text", "")))
                 actual = notes_texts.get(page_index)
                 if actual is None:
@@ -775,8 +801,10 @@ def validate_deck(args):
         and not report["page_validation_missing"]
         and not report["failed_page_validations"]
         and not report["page_contract_violations"]
+        and not report["source_slide_violations"]
         and not report["missing_parts"]
         and not report["notes_hash_mismatches"]
+        and not report["warnings"]
     )
     output = json.dumps(report, ensure_ascii=False, indent=2)
     if args.report:

@@ -158,6 +158,7 @@ def upgrade_deck_manifest(deck_path, max_concurrent_pages):
             "page_jobs": "page_jobs.json",
             "run_state": "run_state.json",
             "max_concurrent_pages": max_concurrent_pages,
+            "include_source_slides": True,
         }
     )
     deck["slide"] = deck_slide_layout(run_dir, deck)

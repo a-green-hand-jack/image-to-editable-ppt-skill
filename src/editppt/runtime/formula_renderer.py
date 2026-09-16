@@ -104,7 +104,8 @@ def build_latex_document(tex: str, *, preamble: str = "", full_document: bool = 
         return tex if tex.endswith("\n") else tex + "\n"
     body = tex.strip()
     if display:
-        body = "\\[\n" + body + "\n\\]"
+        # standalone captures a horizontal box; keep display sizing within math mode.
+        body = "$\\displaystyle\n" + body + "\n$"
     else:
         body = "$" + body + "$"
     return (
@@ -124,17 +125,37 @@ def convert_pdf(pdf: Path, out_path: Path, fmt: str, *, dpi: int, timeout: int) 
         shutil.copy2(pdf, out_path)
         return "copy-pdf"
     if fmt == "svg":
-        dvisvgm = shutil.which("dvisvgm")
-        if dvisvgm:
-            command = [dvisvgm, "--pdf", "--no-fonts", "--exact", "--output", str(out_path), str(pdf)]
+        # Prefer Poppler's pdftocairo on current installations. Newer
+        # dvisvgm builds may reject the host Ghostscript before producing an
+        # artifact, while pdftocairo converts the already compiled PDF
+        # directly to SVG.
+        pdftocairo = shutil.which("pdftocairo")
+        if pdftocairo:
+            command = [pdftocairo, "-svg", str(pdf), str(out_path)]
             _run_converter(command, timeout)
-            return "dvisvgm"
+            return "pdftocairo"
         pdf2svg = shutil.which("pdf2svg")
         if pdf2svg:
             command = [pdf2svg, str(pdf), str(out_path)]
             _run_converter(command, timeout)
             return "pdf2svg"
-        raise FormulaRenderError("SVG output requires dvisvgm or pdf2svg.")
+        dvisvgm = shutil.which("dvisvgm")
+        if dvisvgm:
+            # dvisvgm 3.x expects an output filename pattern. `%f` is
+            # replaced by the input stem. Use a fresh temporary output
+            # directory because the exact expansion is version-dependent.
+            with tempfile.TemporaryDirectory(prefix=".editppt-dvisvgm-", dir=str(out_path.parent)) as tmp:
+                pattern = Path(tmp) / f"result-%f{out_path.suffix}"
+                command = [dvisvgm, "--pdf", "--no-fonts", "--exact", "--output", str(pattern), str(pdf)]
+                _run_converter(command, timeout)
+                generated = sorted(Path(tmp).glob(f"result-*{out_path.suffix}"))
+                if len(generated) != 1:
+                    raise FormulaRenderError(
+                        f"dvisvgm completed without one SVG output (found {len(generated)})"
+                    )
+                shutil.move(str(generated[0]), str(out_path))
+            return "dvisvgm"
+        raise FormulaRenderError("SVG output requires pdftocairo, pdf2svg, or dvisvgm.")
     if fmt == "png":
         magick = shutil.which("magick") or shutil.which("convert")
         if not magick:

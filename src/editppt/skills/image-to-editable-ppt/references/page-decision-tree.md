@@ -1,5 +1,7 @@
 # Page Decision Tree
 
+> Responsibility: define source-grounded object and layout decisions for the page reconstructor. Maintain consistency with manifest and rendering contracts; do not duplicate CLI syntax or invent acceptance evidence.
+
 This file is the single source of truth for page object decisions. Field contracts live in `manifest-schema.md`; command syntax lives in `cli-helper.md`.
 
 Every `source.png` is judged in three steps, in this order:
@@ -39,6 +41,18 @@ Build a complete inventory before deciding anything, so that no object's source 
 - Corner geometry for every rectangle/card/table outline: straight, slight radius, obvious radius, pill.
 
 Record visual objects in `visual_inventory`, readable text in `text_inventory`, and decisions in `background_strategy`; record completed checks in `quality_checks`. Field contracts live in `manifest-schema.md`.
+
+### Source layout anchors
+
+Inspect the whole source before placing individual objects. Identify major panel boundaries, shared edges/centerlines, text baselines, repeated row/column spacing, and connector attachment points. Keep a short account of the relevant relationships and object IDs in the existing `visual_audit.review_notes`; no new schema or separate planning artifact is needed.
+
+- Use `source.png` pixels throughout. Viewer zoom, generated asset-sheet coordinates, slide inches, and rendered PNG pixels are different coordinate systems; do not copy positions between them. The runtime handles the request's `content_box` mapping.
+- Place major containers first, then their contents using shared anchors and source-supported offsets. If three cards share a top edge, reuse that y coordinate rather than estimating it three times. Preserve intentional asymmetry and unequal spacing; reconstruction is not a redesign onto a new grid.
+- Preserve each label's relationship to its panel, icon, or line. Match visible baselines and line breaks as well as box positions. Use explicit `align`/`valign` when the source warrants them; badge-centered text follows section 3.6's shared-box exception.
+- Place separated images by the visible subject's source position and size, accounting for transparent padding in the asset. Centering the PNG rectangle need not center its visible artwork. Inspect alpha/visible bounds using available tools before changing placement; position-only errors do not require another image generation.
+- Derive connector endpoints from the intended source attachment points and gaps. When moving a node or group, update its dependent labels and connectors together; the builder does not infer these relationships for you.
+
+Write the resulting coordinates into the existing manifest fields. Use native image inspection for uncertain regions and the real-render comparison below to correct estimates, rather than building a custom detection or alignment pipeline.
 
 ## 1. Background Recognition and Repair
 
@@ -189,7 +203,9 @@ Record completed calibration with `quality_checks.font_size_calibrated=true`.
 
 ### 3.2 Formula Handling
 
-Transcribe each formula from the source into LaTeX, then render it with `editppt formula render-latex` into an image asset written inside the page directory (prefer SVG; use PNG when SVG preview/PowerPoint compatibility is unstable):
+Before rendering the first formula, inspect executable resolution (`type -a xelatex lualatex pdflatex` in a shell that supports it) and verify the selected engine. A command found on PATH may be a stale container wrapper, not a working TeX installation. Prefer an available host engine: pass its discovered absolute executable path through the existing `--engine` option. If an invocation fails because a wrapper's image is missing, inspect other installed candidates before declaring TeX unavailable; do not pull an unrelated image, modify global PATH, or install a second toolchain as the first repair. Check converters separately: a working TeX engine does not establish SVG/PNG conversion capability.
+
+Transcribe each formula from the source into LaTeX, then render it with `editppt formula render-latex` into an image asset written inside the page directory (prefer SVG through the CLI's Poppler `pdftocairo` route; use PNG when SVG preview/PowerPoint compatibility is unstable):
 
 ```bash
 editppt formula render-latex <page_dir> \
@@ -202,7 +218,11 @@ editppt formula render-latex <page_dir> \
 
 Merge the fragment's `images`, `asset_provenance`, and `formula_inventory` into `manifest.json`; the required provenance fields are in `manifest-schema.md`. Never assemble formulas from Unicode subscripts/superscripts or many hand-written text boxes, and never use source-image formula snippets.
 
-If the machine lacks a TeX engine or converter, or compilation fails: still deliver the current openable PPT with `validation.json` keeping top-level `passed: true` and the failure recorded as a warning — formula id, LaTeX source, CLI error, and required tool/package repair. Do not replace the formula with a full-page screenshot.
+Use the rendered asset's visible aspect ratio when choosing its `box_px`; the builder stretches images to the supplied rectangle. Fit the formula inside the source formula bounds without stretching glyphs to fill a card. Match the source glyph height, weight, and baseline, including small table symbols. For math adjoining native title text, align visible glyph baselines and preserve source spacing; matching bounding-box tops does not align text. Inspect the actual PPT render before clearing the formula's missing/misaligned status.
+
+On failure, distinguish engine discovery, compilation, conversion, and PPT rendering. The CLI tries `pdftocairo`, then `pdf2svg`, then `dvisvgm` for SVG conversion; do not spend repeated retries on a converter that has already failed. Repair the failing layer using the existing CLI; for SVG converter/preview incompatibility, try supported PNG output with the working engine. Preserve the failed command and source LaTeX. Record every source formula separately in `formula_inventory`, including small examples inside cards; a surrounding card or title is not a representation of its formula.
+
+If no permitted working route remains, preserve an openable draft but keep absent or noncompliant formulas in `visual_audit.missing_object_ids` and run the real validator. Do not force `passed: true`, omit formula IDs to satisfy counts, substitute styled text or Unicode notation, or finalize/transfer it as a completed reconstruction. Report the specific blocker and existing draft. Only explicit user authorization can change the required formula representation. Successful LaTeX-derived images remain selectable assets, not native editable equations.
 
 ### 3.3 Structural Primitives and Layout Objects
 
@@ -289,6 +309,7 @@ Text:
 
 Shapes and layers:
 
+- Source layout anchors match in the real render: panel bounds, shared edges, centers, baselines, gaps, and connector attachments. All objects being present is not evidence that these relationships match.
 - Structural line/curve granularity and stroke styles follow 3.3; verify the PPT object structure as well as the rendered appearance.
 
 - Corners follow 3.4; large container corners, table borders, and card borders align with the source. Corner misclassification is a current-page fix, not a low-risk warning.
@@ -305,12 +326,13 @@ Classify defects using the warning allowances below before deciding to repair. A
 - The input cannot be normalized.
 - The page lacks a buildable `manifest.json`/`page.pptx`, or the PPTX cannot be opened.
 - Text font size or position visibly deviates from the source and causes crowding, overflow, or occlusion.
+- Clear displacement of panels, rows, labels, or connector attachments relative to the source, even if every object is present and nothing overlaps. Populate `visual_audit.misaligned_object_ids` until repaired; do not downgrade layout errors to decorative drift.
 
 May ship as recorded warnings with the current PPT — but only after the required object-source workflow has succeeded:
 
 - Minor line-width, antialiasing, proportion, shadow, or detail differences in separated assets, including small edge fringes or isolated remnants that do not affect object completeness or use.
 - Minor visual drift in non-critical decorations.
 - Recorded low-risk font differences.
-- A formula whose LaTeX rendering is blocked by missing local TeX tooling, with the LaTeX source, error, and required repair recorded per 3.2.
+- Minor formula font/antialiasing differences after successful LaTeX rendering; missing or substituted formulas are current-page fixes under 3.2, not delivery warnings.
 
 Warnings never hide a failure to follow the three-step decision process: an object-source violation is always a current-page fix.

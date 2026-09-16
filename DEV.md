@@ -19,7 +19,8 @@
 3. 视觉 agent 根据产品 skill 识别对象，使用逐页提示进行重建；CLI 不内置第二套模型调度器。
 4. `build_pptx_from_manifest.py` 把 manifest 转为 DrawingML/OOXML；`preview.png` 是 Pillow 程序预览。
 5. 外部 LibreOffice/PowerPoint 渲染真实 PPTX，agent 比对源图。`validate_pptx.py` 检查结构及声明的对象覆盖，不自动判断视觉相似度。
-6. `run record` 验证并记录文件哈希，`run finalize` 从 manifest 重建最终 deck 并检查结构和来源。
+6. `run record` 验证并记录文件哈希，`run finalize` 从 manifest 重建最终 deck 并检查结构和来源。最终 deck 默认按每个输入页输出“原始光栅页、可编辑重建页”两页；页级 manifest 仍只描述可编辑重建页，原始页由 finalize 确定性组装。
+7. `export-pdf` 是 finalize 之后的独立交付命令。它通过本地 LibreOffice-compatible renderer 在隔离临时目录中转换 PPTX，检查有效 PDF 后才移动到目标路径；这是实际 PDF 导出证据，不等同于 PPTX 的结构验证。原生对象在 PDF 中可保持矢量，位图素材仍保持位图。
 
 图像 provider 是运行时边界，不是产品 skill 的固定身份。`EDITPPT_IMAGE_BACKEND=api` 配合 `OPENAI_BASE_URL`、`OPENAI_API_KEY` 和 `IMAGE_TO_EDITABLE_PPT_IMAGE_MODEL` 可接入任意 OpenAI-compatible provider；`codex-oauth` 仅用于明确授权的设备本地后端。开发和评测必须记录实际 backend、模型标签和失败层级，但不得记录密钥。开始需要图像分离的页面前先做 backend preflight：工具可用性、端点可达性和源图上传授权缺一不可。
 
@@ -59,6 +60,11 @@ PYTHONPATH=src /path/to/python -m unittest discover -s .agents/tests -v
 
 ## 安装与发布
 
-最终用户使用根目录的 `install.sh`：它从 GitHub 下载指定 ref，安装 CLI，并注册 Codex skill。开发者在本地 checkout 中可使用 `uv tool install --force --editable .`；`.agents/scripts/install.sh` 只服务于已有 checkout，不是公开的一键安装入口。修改源码后重新安装或使用 editable 安装。
+仓库中保留两个同名脚本是有意的，入口和职责不同：
+
+- 根目录 `install.sh` 面向最终用户，从 GitHub 下载 `EDITPPT_REF` 指定的 ref，按 `pyproject.toml` 安装 CLI，并注册随包分发的 Codex skill。
+- `.agents/scripts/install.sh` 面向维护者，只安装当前已有 checkout，使用 editable 模式让源码修改立即进入 CLI；它不下载远程仓库，也不负责公开 skill 注册。
+
+两个脚本都会强制重装，检查 Python 3.10+，并提示 LibreOffice/Poppler 是否可用。设置 `EDITPPT_REQUIRE_SYSTEM_DEPS=1` 时，根目录安装器会在缺少 PPTX/PDF 渲染器时直接失败；默认只警告，因为这些系统程序不是 Python wheel 依赖。修改源码后优先运行 `.agents/scripts/install.sh`，再用 `editppt doctor --json` 和回归测试确认安装版本与 checkout 一致。
 
 发行前运行上述检查，执行 `uv build` 产生 wheel/sdist。wheel 内 `editppt/skills/image-to-editable-ppt/` 是 skill 发布来源，仓库根的文档及 `.agents/` 不作为产品运行依赖。发布目标和渠道由具体发布请求决定；提交、推送和上传不会由构建或安装脚本自动执行。

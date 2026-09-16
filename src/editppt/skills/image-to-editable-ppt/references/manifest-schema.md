@@ -1,5 +1,7 @@
 # Manifest Schema
 
+> Responsibility: define product run/page fields and ownership. Keep this contract consistent with the CLI; do not treat declared audits as independent visual evidence.
+
 This document describes the responsibilities, owners, and current field contracts for `editppt` run/page JSON files. All key state is advanced by `editppt` commands; page reconstructors write only page-local files.
 
 ## Contents
@@ -36,6 +38,7 @@ Key fields:
   "run_id": "job-id",
   "input_type": "image|images|pdf|pptx",
   "max_concurrent_pages": 6,
+  "include_source_slides": true,
   "image_backend": {
     "backend_id": "builtin-imagegen",
     "tool_name": "image_gen.imagegen",
@@ -62,6 +65,8 @@ Key fields:
   "output": "final/origin_edited.pptx"
 }
 ```
+
+`include_source_slides` defaults to `true`: each input page becomes an unchanged source-raster slide followed by its editable reconstruction. `page_count`, page indices and page jobs still count input pages; final slide count is twice that count. Source rasters come from each deck page's `source_image`, share the reconstruction's `content_box`, and are not part of its editable inventory. Notes attach to the reconstruction slide. An explicit `false` preserves reconstruction-only assembly for existing integrations; reconstructors should not change the prepared deck setting.
 
 `visual_audit` is required for every rebuilt page:
 

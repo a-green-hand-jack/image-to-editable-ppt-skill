@@ -338,6 +338,19 @@ def cmd_finalize(args: argparse.Namespace) -> int:
     return run_script("finalize_deck_run.py", [args.run])
 
 
+def cmd_export_pdf(args: argparse.Namespace) -> int:
+    argv = [args.input]
+    if args.out:
+        argv.extend(["--out", args.out])
+    if args.renderer:
+        argv.extend(["--renderer", args.renderer])
+    if args.timeout is not None:
+        argv.extend(["--timeout", str(args.timeout)])
+    if args.json:
+        argv.append("--json")
+    return run_script("export_pdf.py", argv)
+
+
 def cmd_formula_render_latex(args: argparse.Namespace) -> int:
     if args.tex_file:
         tex = Path(args.tex_file).read_text(encoding="utf-8")
@@ -389,7 +402,7 @@ def cmd_formula_render_latex(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog=os.environ.get("IMAGE_TO_EDITABLE_PPT_CLI_PROG", "editppt"),
-        description="CLI for preparing, rebuilding, validating, and finalizing editable PPTX runs.",
+        description="CLI for preparing, rebuilding, validating, finalizing, and exporting editable PPTX runs.",
         formatter_class=HELP_FORMATTER,
         epilog="""Command groups:
   - setup/doctor/config manage the local editppt environment and API fallback config.
@@ -398,12 +411,14 @@ def build_parser() -> argparse.ArgumentParser:
   - page measures text geometry: hints reports text line boxes and font sizes from source ink.
   - image is the Codex OAuth/OpenAI-compatible CLI fallback and processes image files.
   - formula renders LaTeX formulas into PPT image assets and manifest fragments.
+  - export-pdf converts a completed presentation to a PDF using a local office renderer.
 
 Examples:
   editppt setup
   editppt prepare deck.pdf
   editppt run next <run> --json
   editppt run finalize <run>
+  editppt export-pdf <presentation.pptx> --out figure.pdf
   editppt formula render-latex pages/page_001 --tex "\\frac{a}{b}" --out assets/formula.svg --box 100,100,300,80 --fragment formula-fragment.json
 
 Use '<command> --help' for exact arguments:
@@ -633,6 +648,23 @@ Use this when a parent Agent selects image_gen.imagegen or when forcing other ba
     finalize.add_argument("run", metavar="RUN", help="Run directory or deck_manifest.json path.")
     finalize.set_defaults(func=cmd_finalize)
 
+    export_pdf = sub.add_parser(
+        "export-pdf",
+        help="Export a PowerPoint presentation to PDF.",
+        description="Convert a PPT/PPTX file to PDF through a locally installed LibreOffice-compatible renderer.",
+        formatter_class=HELP_FORMATTER,
+        epilog="""Examples:
+  editppt export-pdf run/final/deck_edited.pptx
+  editppt export-pdf figure.pptx --out paper/figure.pdf --json
+""",
+    )
+    export_pdf.add_argument("input", metavar="PPTX", help="PowerPoint presentation to convert.")
+    export_pdf.add_argument("--out", metavar="PDF", help="Output PDF path. Defaults to the input basename with .pdf.")
+    export_pdf.add_argument("--renderer", metavar="PATH", help="LibreOffice/soffice executable (auto-detected by default).")
+    export_pdf.add_argument("--timeout", type=int, default=120, metavar="SECONDS", help="Renderer timeout (default: 120).")
+    export_pdf.add_argument("--json", action="store_true", help="Print machine-readable result metadata.")
+    export_pdf.set_defaults(func=cmd_export_pdf)
+
     formula = sub.add_parser(
         "formula",
         help="Render LaTeX formulas into PPT image assets.",
@@ -652,8 +684,8 @@ can write a manifest image fragment.
         description="""Render one LaTeX formula into an image asset.
 
 This is the high-fidelity formula path. It relies on a local TeX engine
-(xelatex, lualatex, or pdflatex). SVG output additionally requires dvisvgm or
-pdf2svg; PNG output requires ImageMagick. The rendered formula is an image in
+(xelatex, lualatex, or pdflatex). SVG output additionally requires pdftocairo,
+pdf2svg, or dvisvgm; PNG output requires ImageMagick. The rendered formula is an image in
 PowerPoint, not an editable equation object.
 """,
         formatter_class=HELP_FORMATTER,

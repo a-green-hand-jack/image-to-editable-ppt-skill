@@ -1,5 +1,7 @@
 # CLI Helper
 
+> Responsibility: document public CLI syntax and artifact behavior. Maintain consistency with the installed commands; leave reconstruction policy to the skill and its references.
+
 This is the `editppt` command manual: install check, command tree, and syntax examples. Workflow policy lives in `SKILL.md`; object decisions and text-hints usage live in `references/page-decision-tree.md`; file and field contracts live in `references/manifest-schema.md`.
 
 Usage principles:
@@ -13,7 +15,7 @@ Image backend selection is explicit per process: `EDITPPT_IMAGE_BACKEND=api` for
 ## Command Tree
 
 ```text
-editppt                         - top-level CLI for setup, run orchestration, image assets, and formulas
+editppt                         - top-level CLI for setup, run orchestration, image assets, formulas, and PDF export
 |-- setup                       - create or verify the user-level runtime home and config files
 |-- doctor                      - check local runtime health, dependencies, and backend availability
 |-- config                      - write user-level OpenAI-compatible image API fallback settings
@@ -37,8 +39,9 @@ editppt                         - top-level CLI for setup, run orchestration, im
 |   |-- edit                    - edit a source image for clean bases or source-faithful asset sheets
 |   |-- import                  - copy a selected image into the page dir and record provenance
 |   `-- process-sheet           - split a transparent or chroma-key asset sheet into assets
-`-- formula                     - render formula assets from agent-transcribed LaTeX
-    `-- render-latex            - render LaTeX into SVG/PNG/PDF plus a manifest fragment
+|-- export-pdf                 - convert a completed PPT/PPTX to a paper-ready PDF
+`-- formula                    - render formula assets from agent-transcribed LaTeX
+    `-- render-latex           - render LaTeX into SVG/PNG/PDF plus a manifest fragment
 ```
 
 ## Common Help Entrypoints
@@ -50,9 +53,25 @@ editppt page hints --help
 editppt image --help
 editppt image edit --help
 editppt formula render-latex --help
+editppt export-pdf --help
 ```
 
 `editppt image` is the CLI fallback layer. Within that layer it automatically chooses Codex OAuth first, then OpenAI-compatible API credentials from `~/.editppt/config.yaml` or environment variables if OAuth is unavailable. See `manifest-schema.md` for the run/page backend field contract. `editppt doctor` checks CLI backend readiness; it cannot discover whether an agent runtime exposes the built-in tool.
+
+If the input is already a completed PPT/PPTX and the request is only to obtain
+a PDF, use `editppt export-pdf` directly. Do not run `prepare`, dispatch a
+page worker, or reconstruct the image again; those steps are only for raster
+or image-based inputs that still need an editable PPTX.
+
+Export a completed deck after `run finalize`:
+
+```bash
+editppt export-pdf run/final/deck_edited.pptx --out paper/figure.pdf --json
+```
+
+The command uses `soffice` or `libreoffice`, validates that a fresh PDF was produced, and reports the renderer and output path. Native PowerPoint text and shapes remain vector in the PDF; bitmap assets remain bitmap assets.
+
+The finalized deck intentionally contains comparison slides (source raster followed by the editable reconstruction). For a single paper figure, export the corresponding page-local `page.pptx` after it has been reviewed, or use the editable reconstruction page from the finalized deck.
 
 Public `editppt image generate/edit` parameters are intentionally narrow. Required request inputs are `--prompt` or `--prompt-file`, plus at least one `--image` for `edit`. CLI fallback calls should pass an explicit `--out`. Retained useful controls are `--model` (requested model; default `gpt-image-2.5-sunburst`, also accepts `gpt-image-2.5-flare`), `--size` (default `auto`), `--quality` (default `auto`; `xhigh` and `max` require either GPT Image 2.5 model), `--force`, `--dry-run`, `--timeout`, and edit-only `--mask`. The CLI does not pass any other image API options.
 
@@ -159,7 +178,7 @@ Purpose: return a page to `pending` and clear dispatch/result records. Dispatche
 editppt run finalize <run>
 ```
 
-Purpose: after all pages are recorded, rebuild, validate, and output the final PPTX. Final assembly reads each recorded `pages/page_NNN/manifest.json` in page order; `page.pptx` is a page-local deliverability artifact, not the final assembly input.
+Purpose: after all pages are recorded, rebuild, validate, and output the final PPTX. Final assembly inserts each page's source raster followed by its editable reconstruction, reading the recorded `pages/page_NNN/manifest.json` in input order. `page.pptx` remains a single reconstruction slide and is not the final assembly input. Notes attach to the corresponding reconstruction slide.
 
 ## Page Build Commands
 
@@ -282,3 +301,5 @@ editppt formula render-latex pages/page_001 \
 ```
 
 The agent transcribes the formula from the source into LaTeX. The CLI only renders it into an image asset and manifest fragment.
+
+`--engine /absolute/path/to/xelatex` selects a discovered executable instead of the first PATH match. Use this when a stale wrapper shadows a working host installation. SVG conversion prefers Poppler `pdftocairo`, then `pdf2svg`, then `dvisvgm`; `--format png --out assets/formula_001.png` remains the supported raster fallback when SVG conversion or PPT rendering is incompatible. Preserve LaTeX provenance in either format. Recovery and incomplete-output rules live in the decision tree's section 3.2.

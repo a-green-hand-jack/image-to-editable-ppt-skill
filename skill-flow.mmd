@@ -1,4 +1,4 @@
-%% 文档责任：说明 image-to-editable-ppt 从光栅输入到对象级可编辑 PPTX 的产品流程。
+%% 文档责任：说明 image-to-editable-ppt 从光栅输入到对象级可编辑 PPTX 及论文用 PDF 的产品流程。
 %% 维护义务：保持节点与产品 skill、editppt CLI 的实际职责一致；不记录个人设备或临时运行状态。
 flowchart LR
     A[PNG 光栅图] --> B[headless Codex 挂载 image-to-editable-ppt skill]
@@ -18,5 +18,8 @@ flowchart LR
     K --> M[结构验证\n对象、文本、来源、资产哈希]
     M --> N[editppt run record]
     N --> O[editppt run finalize]
-    O --> P[对象级可编辑 PPTX]
+    C -->|原始光栅页| O
+    O --> P[PPTX：每个输入对应原图页 + 可编辑结果页]
+    P --> R[editppt export-pdf\n本地 Office 渲染为论文用 PDF]
+    R --> S[PDF：原生文本/形状保留矢量\n复杂独立素材仍为位图]
     Q[运行时 provider 配置\nEDITPPT_IMAGE_BACKEND + API endpoint/model] -.-> H

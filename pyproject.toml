@@ -1,15 +1,15 @@
 [project]
 name = "image-to-editable-ppt-cli"
-version = "0.1.0"
+version = "0.3.0"
 description = "Self-contained editppt CLI for the image-to-editable-ppt skill."
 requires-python = ">=3.10"
 dependencies = [
-  "PyMuPDF>=1.24.0",
-  "Pillow>=10.0.0",
-  "openai>=2.0.0",
-  "PyYAML>=6.0.0",
-  "numpy>=1.26.0",
-  "requests>=2.31.0",
+  "PyMuPDF>=1.28.2",
+  "Pillow>=12.3.0",
+  "openai>=3.14.0",
+  "PyYAML>=6.0.3",
+  "numpy>=2.2.6",
+  "requests>=2.34.2",
 ]
 
 [project.scripts]
@@ -24,9 +24,16 @@ dev = ["hatchling==1.32.0"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/editppt"]
+exclude = ["src/editppt/skills/**", "**/.DS_Store", "**/__pycache__"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/editppt/skills" = "editppt/skills"
 
 [tool.hatch.build.targets.sdist]
 include = ["/src", "/pyproject.toml", "/uv.lock", "/LICENSE"]
+
+[tool.hatch.build.targets.sdist.force-include]
+"src/editppt/skills" = "src/editppt/skills"
 
 [tool.hatch.build]
 exclude = [

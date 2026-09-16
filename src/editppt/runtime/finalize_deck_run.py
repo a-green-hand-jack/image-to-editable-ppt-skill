@@ -83,6 +83,7 @@ def main():
         "run_id": deck.get("run_id"),
         "status": "complete",
         "page_count": len(jobs.get("pages", [])),
+        "slide_count": len(jobs.get("pages", [])) * (2 if deck.get("include_source_slides", True) is True else 1),
         "output": str(out),
         "validation": str(validation),
         "completed_at": now_iso(),

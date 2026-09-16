@@ -741,6 +741,17 @@ def deck_slide_size(deck, page_entries):
     return emu(slide.get("width", 13.333)), emu(slide.get("height", 7.5))
 
 
+def source_slide_manifest(manifest, source_path):
+    """Place the comparison raster in the reconstruction's content area."""
+    return {
+        "slide": manifest.get("slide", {}),
+        "source": manifest["source"],
+        "content_box": manifest.get("content_box"),
+        "images": [{"path": str(source_path), "name": "Original raster source",
+                    "box_px": [0, 0, *source_size_px(manifest)]}],
+    }
+
+
 def write_deck(deck, page_entries, out_path, notes_entries):
     if not page_entries:
         raise ValueError("Deck has no pages")
@@ -748,16 +759,24 @@ def write_deck(deck, page_entries, out_path, notes_entries):
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
     notes_by_page = {int(entry.get("page_index", 0)): entry for entry in notes_entries if entry.get("text")}
-    notes_indices = sorted(notes_by_page)
-    normalized_entries = [{**entry, "manifest": normalize_manifest(entry["manifest"])} for entry in page_entries]
-    manifests = [entry["manifest"] for entry in normalized_entries]
+    include_source = deck.get("include_source_slides", True) is True
+    slide_entries = []
+    notes_by_slide = {}
+    for page_index, entry in enumerate(page_entries, start=1):
+        if include_source:
+            slide_entries.append({**entry, "manifest": normalize_manifest(
+                source_slide_manifest(entry["manifest"], entry["source_path"]))})
+        slide_entries.append({**entry, "manifest": normalize_manifest(entry["manifest"])})
+        if page_index in notes_by_page:
+            notes_by_slide[len(slide_entries)] = notes_by_page[page_index]
+    manifests = [entry["manifest"] for entry in slide_entries]
     media_index = 1
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
-        z.writestr("[Content_Types].xml", content_types_xml(manifests, notes_indices))
-        write_common_parts(z, len(page_entries), width, height, len(notes_by_page))
-        for slide_index, entry in enumerate(normalized_entries, start=1):
+        z.writestr("[Content_Types].xml", content_types_xml(manifests, sorted(notes_by_slide)))
+        write_common_parts(z, len(slide_entries), width, height, len(notes_by_slide))
+        for slide_index, entry in enumerate(slide_entries, start=1):
             manifest = entry["manifest"]
-            notes_index = slide_index if slide_index in notes_by_page else None
+            notes_index = slide_index if slide_index in notes_by_slide else None
             z.writestr(f"ppt/slides/slide{slide_index}.xml", slide_xml(manifest))
             z.writestr(f"ppt/slides/_rels/slide{slide_index}.xml.rels", rels_xml(manifest, media_index, notes_index))
             base = Path(entry["manifest_path"]).resolve().parent
@@ -768,7 +787,7 @@ def write_deck(deck, page_entries, out_path, notes_entries):
                 z.write(src, f"ppt/media/image{media_index}{image_ext(src)}")
                 media_index += 1
             if notes_index is not None:
-                note = notes_by_page[slide_index]
+                note = notes_by_slide[slide_index]
                 notes_xml = note.get("notes_xml")
                 if notes_xml and Path(notes_xml).exists():
                     z.writestr(f"ppt/notesSlides/notesSlide{notes_index}.xml", Path(notes_xml).read_bytes())
@@ -787,7 +806,10 @@ def page_entries_from_deck_manifest(deck_manifest_path):
         if not manifest_path.is_absolute():
             manifest_path = root / manifest_path
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-        entries.append({"manifest": manifest, "manifest_path": manifest_path})
+        source_path = Path(page["source_image"])
+        if not source_path.is_absolute():
+            source_path = root / source_path
+        entries.append({"manifest": manifest, "manifest_path": manifest_path, "source_path": source_path})
     notes_path = deck.get("notes_manifest")
     notes_entries = []
     if notes_path:
